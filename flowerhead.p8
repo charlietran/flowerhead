@@ -137,15 +137,10 @@ function reset_game()
 	levels.current.planted=0
 	gametime=0
 
-	for g in all(grasses.map) do
-		del(grasses.map,g)
-	end
-	for b in all(bombs.list) do
-		del(bombs.list,b)
-	end
-	for s in all(specks) do
-		del(specks,s)
-	end
+	truncate(grasses.map)
+	truncate(bombs.list)
+	truncate(specks.list)
+	truncate(explosions.list)
 end
 
 function clouds:init()
@@ -1368,6 +1363,13 @@ function outro:draw()
 	print("your time: "..round(gametime/60,2).." seconds", 24, 62, 7)
 	print("press z to restart", 32, 70, 7)
 
+-- utility functions
+--------------------------------
+function truncate(tbl)
+	for o in all(tbl) do
+		del(tbl,o)
+	end
+end
 end
 
 __gfx__
