@@ -353,16 +353,18 @@ function levels:update()
 	end
 end
 
-levelcomplete={lines={}}
-
-levelcomplete.lines[1]={
-	x1=-5,y1=-5,x2=24,y2=60,
-	duration=40,dt=1,
-	text="level complete",
-	chars={}
-}
-
 banners={list={}}
+
+function banners:add(b)
+  add(self.list,{
+    text=b.text,
+    dur=b.dur or 90,
+    move_dur=b.move_dur or 30,
+    timer=0,
+    move_timer=0
+  })
+end
+
 function banners:update()
   for b in all(self.list) do
     if b.timer<b.dur then
@@ -380,26 +382,17 @@ function banners:draw()
   for b in all(self.list) do
     local t=ease_out_quad(b.move_timer/b.move_dur)
     for y=0,24 do
-      local c=(y==0 or y==24) and 7 or 3
+      local c=(y==0 or y==24) and 7 or 13
       for x=0,127 do
         local targety=y+38*t+(sin(time()/2 + x/50)*1.1)
         pset(cam.x-64+x,cam.y-64+targety,c)
       end
     end
 
-    print(b.text, cam.x-64+5, cam.y-54+38*t, 7)
+    print(b.text, cam.x-#b.text*2, cam.y-54+38*t, 7)
   end
 end
 
-function banners:add(b)
-  add(self.list,{
-    text=b.text,
-    dur=b.dur or 75,
-    move_dur=b.move_dur or 30,
-    timer=0,
-    move_timer=0
-  })
-end
 levelcomplete={lines={}}
 levelcomplete.lines[1]={
 	y1=-5,y2=40,
@@ -452,10 +445,8 @@ function levelcomplete:update()
 			line.dt+=1
 			local t=line.dt/line.duration
 			for char in all(line.chars) do
-				local dx=char.x2-char.x1
-				local dy=char.y2-char.y1
-				char.x=char.x1+ease_out_quad(t)*dx
-				char.y=char.y1+ease_out_quad(t)*dy
+				char.x=char.x1+ease_out_quad(t)*char.dx
+				char.y=char.y1+ease_out_quad(t)*char.dy
 			end
 		end
 	end
@@ -492,10 +483,12 @@ function levelcomplete:draw()
 					if line.dt/line.duration<0.3 then
             color=1
           end
+          local x=cam.x-64+char.x
+          local y=cam.y-64+char.y
 					rectfill(
-						char.x-1,char.y-1,
-						char.x+4,char.y+5,color)
-					print(char.string,char.x,char.y,color+4)
+						x-1,y-1,
+						x+4,y+5,color)
+					print(char.string,x,y,color+4)
 				end
 			end
 		end
