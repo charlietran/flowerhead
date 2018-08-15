@@ -285,21 +285,32 @@ function levels:add(cx1,cy1)
 		end
 	end
 
-  -- determine the number of plantable blocks
+
   lvl.plantable=0
   lvl.planted=0
-  for y=cy1,lvl.y2/8 do
-    for x=cx1,lvl.x2/8 do
+
+
+  for y=cy1,lvl.cy2 do
+    for x=cx1,lvl.cx2 do
       local t=mget(x,y)
       local at=mget(x,y-1)
+      -- if a static block or floor block, add to plantable
       if t==1 or t==3 then
-        if not iswall(at) and not is_spike(at) then
+        if not iswall(at) and at~=35 and at~=36 and not is_spike(at) then
           lvl.plantable+=8
         end
+      end
+
+      -- if a closed door, set door location
+      if t==35 then
+        lvl.doorx=x
+        lvl.doory=y
+        lvl.dooropen=false
       end
     end
   end
 
+  -- get closed door location, if there
 	levels:set_spawn(lvl)
 
 	lvl.percent_complete=0
@@ -336,8 +347,9 @@ function levels:update()
 		return false
 	end
 	local c=self.current
-	if c.planted/c.plantable>=1 then
-		--levelcomplete:start()
+	if not levels.current.dooropen and c.planted/c.plantable>=1 then
+    levels.current.dooropen=true
+    mset(levels.current.doorx,levels.current.doory,36)
 	end
 end
 
@@ -388,27 +400,45 @@ function banners:add(b)
     move_timer=0
   })
 end
+levelcomplete={lines={}}
+levelcomplete.lines[1]={
+	y1=-5,y2=40,
+	duration=40,dt=1,
+	text="level complete",
+	chars={}
+}
 
-function levelcomplete:start()
-	gamestate="lvlcomplete"
-	player.vx=0
+levelcomplete.lines[2]={
+	y1=-5,y2=50,
+	duration=40,dt=1,
+	text="press z",
+	chars={}
+}
+
+function levelcomplete:init()
 	for line in all(self.lines) do
 		line.dt=1
+    local xc=64-#line.text*3
 		for i=1,#line.text do
 			local char={}
 			local offset=(i-1)*10
 			char.string=sub(line.text,i,i)
 
-			char.x1=line.x1 + (10*(i-1))
-			char.x2=line.x2 + (6*(i-1))
-			char.y1=line.y1-offset
-			char.y2=line.y2
+      char.x1=xc
+      char.dx=xc + (6*(i-1)) - xc
+      char.y1=line.y1-offset
+      char.dy=line.y2-(line.y1-offset)
 
 			char.x=char.x1
 			char.y=char.y1
 			line.chars[i]=char
 		end
 	end
+end
+
+function levelcomplete:start()
+	gamestate="lvlcomplete"
+	player.vx=0
 	music(10)
 end
 
@@ -435,6 +465,12 @@ function levelcomplete:update()
 		levels.current=levels.list[levels.index]
 		reset_game()
     banners:add({text="level "..levels.index})
+    for line in all(self.lines) do
+      line.dt=1
+			for char in all(line.chars) do
+        char.x,char.y=char.x1,char.y1
+      end
+    end
 
 		gamestate="game"
 		music(0)
@@ -683,7 +719,6 @@ function player.bombinput(p)
 		p.hit_bomb=false
 	end
 	p.is_bombing=bomb_pressed
-
 	if p.hit_bomb then
 		p:throw_flowerbomb()
 		p.throwtimer=7
@@ -1155,10 +1190,18 @@ function grasses.plant(x,y)
 
 	-- insert one of four possible
 	-- flower types
-	if iswall(tile2) and tile1~=48 and not iswall(tile1) then
+	if is_plantable(tile1,tile2) then
 		levels.current.planted+=1
 		grasses.map[y][x]=flr(rnd(4))
 	end
+end
+
+function is_plantable(tile1,tile2)
+	return iswall(tile2)
+          and tile1~=48
+          and tile1~=35
+          and tile1~=36
+          and not iswall(tile1)
 end
 
 
