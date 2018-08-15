@@ -4,6 +4,14 @@ __lua__
 -- f l o w e r h e a d
 -- by charlie tran
 
+-- todo
+--
+-- instructions / tutorial
+-- exit
+-- levels, diff progression
+-- bomb walls for climbing
+-- enemies
+
 function _init()
 	-- how many pixels per frame
 	-- should our y velocity
@@ -15,7 +23,7 @@ function _init()
 	runanimspeed=.12
 	wallrunanimspeed=.2
 
-	-- delta time multiplier, 
+	-- delta time multiplier,
 	-- essentially controls the
 	-- speed of the game
 	dt=.5
@@ -47,11 +55,12 @@ function _init()
 		specks,
 		bombs,
 		explosions,
-		levelcomplete
+		levelcomplete,
+    banners
 	}
 
 	for object in all(objects) do
-		if(object.init) object:init()
+		if object.init then object:init() end
 	end
 end
 
@@ -69,13 +78,11 @@ function _updategame()
 	gametime+=1
 	for object in all(objects) do
 		cam:update()
-		if(object.update) object:update()
+		if object.update then object:update() end
 	end
 end
 
 function _draw()
-	if(clear_screen) cls()
-
 	if gamestate=="intro" then
 		intro:draw()
 	elseif gamestate=="outro" then
@@ -86,27 +93,28 @@ function _draw()
 end
 
 function _drawgame()
-	-- debug=true
-	if(debug) draw_debug()
+  cls()
+  -- debug=true
+	if(debug) then draw_debug() end
 
-	for object in all(objects) do
-		if(object.draw) object:draw()
-	end
+  for object in all(objects) do
+    if object.draw then object:draw() end
+  end
 
-	-- rectfill(cam.x-61, cam.y-64, cam.x-44,cam.y-59, 11)
+  -- rectfill(cam.x-61, cam.y-64, cam.x-44,cam.y-59, 11)
 
-	local percent=(levels.current.planted / levels.current.plantable)*100
-	print(round(percent,2).."%",cam.x-60,cam.y-64,11)
+  local percent=(levels.current.planted / levels.current.plantable)*100
 
-	if cam.fadeout>0 then
-		for i=0,15 do
-			pal(i,i*(1-cam.fadeout),1)
-		end
-	else
-		pal()
-	end
-	if(cam.fadeout>0) cam.fadeout-=.1
+  print(round(percent,2).."%",cam.x-60,cam.y-64,11)
 
+  if cam.fadeout>0 then
+    for i=0,15 do
+      pal(i,i*(1-cam.fadeout),1)
+    end
+  else
+    pal()
+  end
+  if cam.fadeout>0 then cam.fadeout-=.1 end
 end
 
 function round(num, numdecimalplaces)
@@ -162,14 +170,14 @@ function clouds:draw()
 	-- fillp(0b1010010110100101)
 
 	-- this time factor is used to
-	-- drift the clouds in the 
+	-- drift the clouds in the
 	-- x direction. multiplied by
 	-- 10 to get the right cloud
 	-- drifting speed
 	local t=time()*10
 
-	-- draw the clouds as circles 
-	-- drifting in the x direction 
+	-- draw the clouds as circles
+	-- drifting in the x direction
 	-- over time and with parallax
 	local cloudalt=true
 	for cloud in all(self.list) do
@@ -197,7 +205,7 @@ function clouds:draw()
 				fillp(clouds.pattern2)
 			end
 
-			-- draw our circle, with a 
+			-- draw our circle, with a
 			-- 128 modulo so that it
 			-- cycles through the left
 			-- to right screen edges
@@ -217,7 +225,7 @@ end
 
 levels={
 	index=1, -- current lvl index
-	list={} 
+	list={}
 }
 
 -- find each level block, add
@@ -267,31 +275,25 @@ function levels:add(cx1,cy1)
 		end
 	end
 
--- determine the number of plantable blocks
-lvl.plantable=0
-lvl.planted=0
-for y=cy1,lvl.y2/8 do
-	for x=cx1,lvl.x2/8 do
-		local t=mget(x,y)
-		local at=mget(x,y-1)
-		if t==1 or t==3 then
-			if not iswall(at) and not is_spike(at) then
-				lvl.plantable+=8
-			end
-		end
-	end
-end
+  -- determine the number of plantable blocks
+  lvl.plantable=0
+  lvl.planted=0
+  for y=cy1,lvl.y2/8 do
+    for x=cx1,lvl.x2/8 do
+      local t=mget(x,y)
+      local at=mget(x,y-1)
+      if t==1 or t==3 then
+        if not iswall(at) and not is_spike(at) then
+          lvl.plantable+=8
+        end
+      end
+    end
+  end
 
 	levels:set_spawn(lvl)
+
 	lvl.percent_complete=0
 	add(self.list,lvl)
-	printh("level added:")
-	printh("x1: "..lvl.x1)
-	printh("y1: "..lvl.y1)
-	printh("x2: "..lvl.x2)
-	printh("y2: "..lvl.y2)
-	printh("spawn x: "..lvl.spawnx)
-	printh("spawn x: "..lvl.spawny)
 end
 
 function levels:set_spawn(lvl)
@@ -306,7 +308,7 @@ function levels:set_spawn(lvl)
 				break
 			end
 		end
-		if(player.x) break
+		if player.x then break end
 	end
 end
 
@@ -405,8 +407,8 @@ function levelcomplete:draw()
 		end
 end
 
+
 --------------------------------
--->8
 --player object-----------------
 player={}
 
@@ -426,7 +428,7 @@ function player:init()
 	player.etimer=0
 
 	--the sprite is 3x5, so the
-	--wr and hr dimensions are 
+	--wr and hr dimensions are
 	--radii, and x/y is the
 	--initial center position
 
@@ -446,7 +448,7 @@ function player:init()
 	player.wallsliding=false
 
 	--what direction we're facing
-	--1 or -1, used when we're 
+	--1 or -1, used when we're
 	--facing away from a wall
 	--while sliding
 	player.facing=1
@@ -492,14 +494,14 @@ function player:draw()
 	end
 
 	self.headanimtimer=self.headanimtimer%3+1
-	
+
 	--if throwing, draw swoosh
 	if self.throwtimer>0 then
 		local xoff=-4
 		if self.flipx then
 			xoff=-2
 		end
-		
+
 		sspr(
 			32,32,7,6,
 			self.x+xoff,
@@ -550,7 +552,7 @@ function player:update()
 	if player.dying then
 		if player.dying_timer==0 then
 			player.vx=0
-		 if(gamestate=="game")reset_game()
+		 if gamestate=="game" then reset_game() end
 		else
 			player.dying_timer-=1
 		end
@@ -586,7 +588,7 @@ function player:checksliding()
 end
 
 function player:handleinput()
-	if(gamestate~="game") return
+	if gamestate~="game" then return end
 	if self.standing then
 		self:groundinput()
 	else
@@ -634,7 +636,7 @@ function player.movejump(p)
 	-- allow walljump if sliding
 	elseif p.wallsliding then
 		--use normal jump speed,
-		--but proportionate to how 
+		--but proportionate to how
 		--fast player is currently
 		--sliding down wall
 		p.vy-=p.jumpv
@@ -657,13 +659,13 @@ function player.groundinput(p)
 		p.facing=-1
 		--brake if moving in
 		--opposite direction
-		if(p.vx>0) p.vx*=.9
+		if p.vx>0 then p.vx*=.9 end
 		p.vx-=.2*dt
 	--pressing right
 	elseif btn(1) then
 		p.flipx=false
 		p.facing=1
-		if(p.vx<0) p.vx*=.9
+		if p.vx<0 then p.vx*=.9 end
 		p.vx+=.2*dt
 	--pressing neither, slow down
 	--by our friction amount
@@ -709,13 +711,13 @@ function player.movex(p)
 		else
 			--move if we didn't hit
 			p.x+=step
-		end	
+		end
 
 	end
 end --player.movex
 
 function player.movey(p)
-	--always apply gravity 
+	--always apply gravity
 	--(downward acceleration)
 	p.vy+=gravity*dt
 
@@ -792,7 +794,7 @@ function player.landing_effects(p)
 
 	--play a landing sound
 	--based on current y speed
-	if p.landing_v>5 then 
+	if p.landing_v>5 then
 		sfx(15)
 	else
 		sfx(14)
@@ -894,13 +896,12 @@ function player:die()
 	cam:shake(30,2)
 end
 
---------------------------------
--->8
 --collision code----------------
+--------------------------------
 
--- given an agent and velocity, 
--- this returns the coords of 
--- which two coords should 
+-- given an agent and velocity,
+-- this returns the coords of
+-- which two coords should
 -- be checked for collisions
 function col_points(p,a,v)
 	local x1,x2,y1,y2
@@ -977,7 +978,7 @@ end
 
 	--if not nearonly, check if
 	--either corner will hit a wall
-	if not nearonly and (iswall(tile1) or iswall(tile2)) then 
+	if not nearonly and (iswall(tile1) or iswall(tile2)) then
 		return true
 	end
 
@@ -998,9 +999,12 @@ function is_spike(tile)
 	return tile==48
 end
 
---------------------------------
--->8
+function is_exit(tile)
+  return tile==36
+end
+
 --effects-----------------------
+--------------------------------
 
 --specks holds all particles to
 --be drawn in our object loop
@@ -1035,9 +1039,8 @@ function specks:draw()
 	end
 end
 
---------------------------------
--->8
 --grass objects-----------------
+--------------------------------
 grasses={
 	map={},
 	t=0,
@@ -1080,7 +1083,7 @@ function grasses.plant(x,y)
 	local tile1,tile2
 	tile1=mget(x/8,y/8)
 	tile2=mget(x/8,(y+2)/8)
-	
+
 	-- insert one of four possible
 	-- flower types
 	if iswall(tile2) and tile1~=48 and not iswall(tile1) then
@@ -1325,9 +1328,8 @@ function intro:update()
 	end
 end
 
---------------------------------
--->8
 --camera------------------------
+--------------------------------
 cam={}
 -- x/y represent the current
 -- offset of the camera. offset
@@ -1371,7 +1373,7 @@ function cam:update()
 	if (self.y+self.thresh_y)<player.y then
 		self.y+=min(player.y-(self.y+self.thresh_y),4)
 	end
-	-- and lastly, if too far 
+	-- and lastly, if too far
 	-- below player, shift it up
 	if (self.y-self.thresh_y)>player.y then
 		self.y-=min((self.y-self.thresh_y)-player.y,4)
