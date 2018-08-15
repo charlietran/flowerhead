@@ -7,10 +7,10 @@ __lua__
 -- todo
 --
 -- instructions / tutorial
--- exit
 -- levels, diff progression
--- bomb walls for climbing
 -- enemies
+
+debug=false
 
 function _init()
 	-- how many pixels per frame
@@ -90,12 +90,19 @@ function _draw()
 	else
 		_drawgame()
 	end
+
+	-- performance info
+  if debug then
+	print(
+    "mem: "..(flr(stat(0)/2048*100)).."% "..
+    "cpu: "..flr(stat(1)*100).."% "..
+    "fps: "..stat(7),
+    cam.x-63,cam.y-63,7)
+  end
 end
 
 function _drawgame()
   cls()
-  -- debug=true
-	if(debug) then draw_debug() end
 
   for object in all(objects) do
     if object.draw then object:draw() end
