@@ -77,6 +77,7 @@ end
 function _updategame()
 	gametime+=1
 	for object in all(objects) do
+    -- update the camera position before everything else
 		cam:update()
 		if object.update then object:update() end
 	end
@@ -90,15 +91,16 @@ function _draw()
 	else
 		_drawgame()
 	end
+  if(debug) draw_debug()
+end
 
-	-- performance info
-  if debug then
-	print(
-    "mem: "..(flr(stat(0)/2048*100)).."% "..
-    "cpu: "..flr(stat(1)*100).."% "..
-    "fps: "..stat(7),
-    cam.x-63,cam.y-63,7)
-  end
+function draw_debug()
+  rectfill(cam.x-63,cam.y+56,cam.x+63,cam.y+62,1)
+  print(
+  "mem: "..(flr(stat(0)/2048*100)).."% "..
+  "cpu: "..flr(stat(1)*100).."% "..
+  "fps: "..stat(7),
+  cam.x-62,cam.y+57,7)
 end
 
 function _drawgame()
@@ -567,11 +569,13 @@ function player:init()
 
 	player.x=levels.current.spawnx
 	player.y=levels.current.spawny
-	printh("--player init--")
-	printh("player.x: "..player.x)
-	printh("player.y: "..player.y)
-	printh("cam.x: "..cam.x)
-	printh("cam.y: "..cam.y)
+  if debug then
+    printh("--player init--")
+    printh("player.x: "..player.x)
+    printh("player.y: "..player.y)
+    printh("cam.x: "..cam.x)
+    printh("cam.y: "..cam.y)
+  end
 end
 
 function player:draw()
