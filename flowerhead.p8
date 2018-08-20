@@ -457,6 +457,12 @@ function levelcomplete:update()
 	if btnp(4) then
 		levels.index+=1
 		levels.current=levels.list[levels.index]
+
+    if not levels.current then
+      gamestate="outro"
+      return
+    end
+
 		reset_game()
     banners:add({text="level "..levels.index})
     for line in all(self.lines) do
