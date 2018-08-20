@@ -10,7 +10,8 @@ __lua__
 -- levels, diff progression
 -- enemies
 
-debug=true
+debug=false
+menuitem(1,"toggle debugging", function() debug=not debug end)
 
 function _init()
 	-- how many pixels per frame
