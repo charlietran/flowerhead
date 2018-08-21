@@ -35,6 +35,8 @@ function _init()
 	-- clear screen every frame?
 	clear_screen=true
 
+  coroutines={}
+
 	-- gamestate starts in "intro"
 	-- and then move into "game"
 	-- and then "end"
@@ -66,6 +68,8 @@ function _init()
 end
 
 function _update60()
+  run_coroutines()
+
 	if gamestate=="intro" then
 		intro:update()
 	elseif gamestate=="outro" then
@@ -73,6 +77,16 @@ function _update60()
 	else
 		_updategame()
 	end
+end
+
+function run_coroutines()
+  for _,coroutine in pairs(coroutines) do
+    if costatus(coroutine) != 'dead' then
+      local ok,error=cowrap(coroutine)
+    else
+      del(coroutines,coroutine)
+    end
+  end
 end
 
 function _updategame()
@@ -358,46 +372,65 @@ end
 
 banners={list={}}
 
-function banners:add(b)
-  local b = add(self.list,{
-    title=b.title or "",
-    caption=b.caption or "",
-    h=b.h or 38, -- banner height,
+function banners:add(_banner)
+  local banner = {
+    title=_banner.title or "",
+    caption=_banner.caption or "",
+    height=_banner.height or 38,
     x=0,
-  })
-  b.y=cam.y-64-b.h -- start banner off screen
-  b.animation={
-    duration=b.duration or 45,
-    x2=0,
-    y2=20,
-    delay=90,
-    easing=ease_out_quad
   }
-  b.cor=cocreate(animate)
-end
+  banner.y=-banner.height -- start banner off screen
+  add(self.list,banner)
 
-function banners:update()
-  for b in all(self.list) do
-    if costatus(b.cor) != 'dead' then
-      local ok,error=cowrap(b.cor,b)
-    else
-      del(self.list,b)
-    end
-  end
+  local anim1={
+    duration=45,
+    x=0,
+    y=20
+  }
+  local anim2={
+    duration=45,
+    x=0,
+    y=-banner.height,
+    easing=ease_in_quad
+  }
+
+  local sequence=make_sequence(
+    make_animation(banner,anim1),
+    make_delay(30),
+    make_animation(banner,anim2),
+    function() del(self.list,banner) end)
+
+  add(coroutines,cocreate(sequence))
 end
 
 function banners:draw()
   --local ox,oy=cam.x-64,cam.y-64
   for _,b in pairs(self.list) do
-    -- adjust banner and y for camera position
+
+    -- adjust banner x and y for camera position
     local x=cam.x-64+b.x
     local y=cam.y-64+b.y
-    rectfill(x,y,x+127,y+b.h,1)
+    local width=100
+    local margin=(128-width)/2
+
+    rectfill(x+margin+2,y+2,x+margin+width+2,y+b.height+2,2)
+    fillp(0b0111101111011110)
+    rectfill(x+margin,y,x+margin+width,y+b.height,1)
+    fillp()
+
     for i=1,#b.title do
-      print(sub(b.title,i,i), x+(128-#b.title*6)/2 + (i-1)*6, y+b.h/3+sin(i/#b.title + t()/2), 10)
+      print(
+      sub(b.title,i,i),
+      x+margin+(width-#b.title*6)/2 + (i-1)*6,
+      y+b.height/4+sin(i/#b.title + t()/2),
+      10)
     end
 
-    print(b.caption,x+(128-#b.caption*4)/2,y+b.h-10,7)
+    print(
+      b.caption,
+      x+margin+(width-#b.caption*4)/2,
+      y+b.height*3/4,
+      7)
   end
 end
 
@@ -1584,9 +1617,8 @@ tutorials.list[113]={
 
 tutorials.list[114]={
   lines={
-		{c=7,t="the door is closed!"},
     {c=7,t="fill the dungeon with"},
-    {c=7,t="flowers to open it"},
+    {c=7,t="flowers to unlock exit"},
     {c=7,t=""},
     {c=7,t="x: throw flower bomb"},
   }
@@ -1652,47 +1684,59 @@ end
 -- wrapper for resuming w/ error
 function cowrap(cor,...)
   local ok,err=coresume(cor,...)
+  -- if the coroutine throws an error,
+  -- halt the program and show it
   assert(ok, err)
 end
--- object expected to have x2,y2,anim_duration properties
-function animate(obj)
-  local a=obj.animation
-  local ox,oy=obj.x,obj.y
-  local dx=a.x2-obj.x
-  local dy=a.y2-obj.y
-  local dur=a.duration
-  local t=0
 
-  for dt=1,dur do
-    t = a.easing(dt/dur)
-    obj.x=ox+(t*dx)
-    obj.y=oy+(t*dy)
-    yield()
+-- create an animation function to be
+-- used in a coroutine
+function make_animation(obj,params)
+  return function()
+    local x1,y1,x2,y2,dx,dy,duration,easing,percent
+    x1,y1,x2,y2=obj.x,obj.y,params.x,params.y
+    dx,dy=x2-x1,y2-y1
+    duration=params.duration
+    easing=params.easing or ease_out_quad
+    percent=0
+    for dt=1,duration do
+      percent=easing(dt/duration)
+      obj.x=x1+(percent*dx)
+      obj.y=y1+(percent*dy)
+      yield()
+    end
+    obj.x=x2
+    obj.y=y2
   end
+end
 
-  obj.x=a.x2
-  obj.y=a.y2
-
-  for dt=1,a.delay do
-    yield()
+function make_delay(duration)
+  return function()
+    for i=1,duration do
+      yield()
+    end
   end
+end
 
-  --ox,oy=obj.x,obj.y
-  --dx,dy=-dx,-dy
-  --for dt=1,dur do
-    --printh('animating out')
-    --t = a.easing(dt/dur)
-    --obj.x=ox+(t*dx)
-    --obj.y=oy+(t*dy)
-    --yield()
-  --end
+function make_sequence(...)
+  local args={...}
+  return function()
+    for _,fn in pairs(args) do
+      fn()
+    end
+  end
 end
 
 -- easing function, meant to be
 -- used with a num ranging 0-1
 -- use for levelcomplete anim
+-- from: https://gist.github.com/gre/1650294
 function ease_out_quad(t)
 	return t*(2-t)
+end
+
+function ease_in_quad(t)
+  return t*t
 end
 
 function linear(t)
