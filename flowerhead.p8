@@ -60,7 +60,7 @@ function _init()
     banners
 	}
 
-	for object in all(objects) do
+	for _,object in pairs(objects) do
 		if object.init then object:init() end
 	end
 end
@@ -77,7 +77,7 @@ end
 
 function _updategame()
 	gametime+=1
-	for object in all(objects) do
+	for _,object in pairs(objects) do
     -- update the camera position before everything else
 		cam:update()
 		if object.update then object:update() end
@@ -107,7 +107,7 @@ end
 function _drawgame()
   cls()
 
-  for object in all(objects) do
+  for _,object in pairs(objects) do
     if object.draw then object:draw() end
   end
 
@@ -190,7 +190,7 @@ function clouds:draw()
 	-- drifting in the x direction
 	-- over time and with parallax
 	local cloudalt=true
-	for cloud in all(self.list) do
+	for _,cloud in pairs(self.list) do
 			local cloudx, cloudy
 			-- the y offset is the
 			-- product of our current cam
@@ -374,7 +374,6 @@ function banners:add(b)
     easing=ease_out_quad
   }
   b.cor=cocreate(animate)
-
 end
 
 function banners:update()
@@ -453,7 +452,7 @@ function levelcomplete:update()
 		if line.dt < line.duration then
 			line.dt+=1
 			local t=line.dt/line.duration
-			for char in all(line.chars) do
+			for _,char in pairs(line.chars) do
 				char.x=char.x1+ease_out_quad(t)*char.dx
 				char.y=char.y1+ease_out_quad(t)*char.dy
 			end
@@ -473,7 +472,7 @@ function levelcomplete:update()
     banners:add({title="level "..levels.index})
     for line in all(self.lines) do
       line.dt=1
-			for char in all(line.chars) do
+			for _,char in pairs(line.chars) do
         char.x,char.y=char.x1,char.y1
       end
     end
@@ -486,8 +485,8 @@ end
 
 function levelcomplete:draw()
 		if gamestate=="lvlcomplete" then
-			for line in all(self.lines) do
-				for char in all(line.chars) do
+			for _,line in pairs(self.lines) do
+				for _,char in pairs(line.chars) do
 					local color={}
 					if line.dt/line.duration<=1 then
             color=3
@@ -1122,7 +1121,7 @@ end
 --be drawn in our object loop
 specks={list={}}
 function specks:update()
-	for speck in all(self.list) do
+	for _,speck in pairs(self.list) do
 		speck.ox=speck.x
 		speck.oy=speck.y
 		speck.x+=speck.vx
@@ -1142,7 +1141,7 @@ function specks:update()
 end
 
 function specks:draw()
-	for speck in all(self.list) do
+	for _,speck in pairs(self.list) do
 		line(
 			speck.x,
 			speck.y,
@@ -1234,7 +1233,7 @@ bombs.list={}
 bombs.anim_frames={{16,8},{19,8},{22,8},{16,11},{19,11},{22,11},{16,14},{19,14}}
 
 function bombs:draw()
-	for bomb in all(self.list) do
+	for _,bomb in pairs(self.list) do
 		if bomb.dead or bomb.exploded then
 			goto bomb_draw_continue
 		end
@@ -1258,7 +1257,7 @@ function bombs:draw()
 end
 
 function bombs.update(b)
-	for bomb in all(b.list) do
+	for _,bomb in pairs(b.list) do
 
 		if bomb.exploded then
 			bombs.exploding(bomb)
@@ -1339,12 +1338,12 @@ explosions={}
 explosions.list={}
 
 function explosions.update()
-	for e in all(explosions.list) do
+	for _,e in pairs(explosions.list) do
 		if #e.sparks==0 then
 			del(explosions.list,e)
 		end
 
-		for s in all(e.sparks) do
+		for _,s in pairs(e.sparks) do
 			s.x+=s.vx / s.mass
 			s.y+=s.vy / s.mass
 			s.r-=0.2
@@ -1356,8 +1355,8 @@ function explosions.update()
 end -- explosions.update()
 
 function explosions.draw()
-	for e in all(explosions.list) do
-		for s in all(e.sparks) do
+	for _,e in pairs(explosions.list) do
+		for _,s in pairs(e.sparks) do
 			local color
 			if s.r>2.5 then
 				color=11
@@ -1368,13 +1367,7 @@ function explosions.draw()
 			end
 			circfill(s.x,s.y,s.r,color)
 		end
-	end --for e in all(explosions.list)
-		-- circfill(
-		-- 	e.x,
-		-- 	e.y,
-		-- 	e.r*(e.life_r/e.life),
-		-- 	7)
-		-- end
+	end --for _,e in pairs(explosions.list)
 end
 
 function explosions.add(x,y,intensity)
