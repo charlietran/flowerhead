@@ -1344,19 +1344,18 @@ function bombs.update(b)
 	end -- bomb for loop
 end -- bombs.update()
 
-function bombs.add(b,x,y)
-	local bomb={}
-	bomb.wr=1
-	bomb.hr=1
-	bomb.x=x
-	bomb.y=y
-	bomb.vx=(0.2+rnd(1.5))*player.facing
-	bomb.vy=-3
-	bomb.anim_timer=0
-	bomb.die=function(self)
-		self.dead=true
-	end
-	add(b.list,bomb)
+function bombs:add(x,y)
+	local bomb={
+    wr=1,
+    hr=1,
+    x=x,
+    y=y,
+    vx=(.5+rnd(.25))*player.facing+player.vx,
+    vy=-2.5,
+    anim_timer=0,
+    die=function(self)self.dead=true end
+  }
+	add(self.list,bomb)
 end
 
 function bombs.explode(bomb)
