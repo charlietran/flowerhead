@@ -557,6 +557,8 @@ end
 player={}
 
 function player:init()
+  self.player=true
+
 	-- velocity
 	player.vx=0
 	player.vy=0
@@ -1115,7 +1117,7 @@ function collide(e,a,d,nearonly)
 	local tile2=mget(x2/8,y2/8)
 
 
-  if gamestate=="game" and (is_exit(tile1) or is_exit(tile2)) then
+  if gamestate=="game" and e.player and (is_exit(tile1) or is_exit(tile2)) then
     levelcomplete:start()
   end
 
