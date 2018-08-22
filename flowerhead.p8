@@ -152,7 +152,7 @@ end
 clouds={}
 clouds.list={}
 
-function reset_game()
+function reset_level()
 	player:init()
 	cam.fadeout=1
 	grasses.map={}
@@ -160,10 +160,15 @@ function reset_game()
 	levels.current.planted=0
 	gametime=0
 
-	truncate(grasses.map)
-	truncate(bombs.list)
-	truncate(specks.list)
-	truncate(explosions.list)
+  if not levels.current.started then
+    levels.current.started=true
+    banners:add(levels.current.banner)
+  else
+    truncate(grasses.map)
+    truncate(bombs.list)
+    truncate(specks.list)
+    truncate(explosions.list)
+  end
 end
 
 function clouds:init()
@@ -246,10 +251,26 @@ function clouds:draw()
 	fillp()
 end
 
-
 levels={
 	index=1, -- current lvl index
 	list={}
+}
+
+levels.list[1]={
+  cx1=0,cy1=0,
+  bombs_disabled=true,timer_disabled=true,
+  banner={
+    title="level 1",
+    caption="welcome to the dungeon"
+  }
+}
+levels.list[2]={
+  cx1=16,cy1=0,
+  enemies_disabled=true,timer_disabled=true,
+  banner={
+    title="level 2",
+    caption="plant some flowers!"
+  }
 }
 
 -- find each level block, add
@@ -259,53 +280,46 @@ function levels:init()
 	-- tile 7 is bottom left
 	-- tile 8 is the top left
 	-- tile 9 is top right
-	for i=0,127 do
-		for j=0,63 do
-			if mget(i,j)==8 then
-				levels:add(i,j)
-			end -- if mget(i,j)
-		end -- for j=0,31
-	end -- for i=0,127
+  for level in all(levels.list) do
+    levels.setup(level)
+  end
+
 	levels.current=levels.list[1]
-  -- manually disabled bombs on the first level
-  levels.list[1].bombs_disabled=true
-  banners:add({title="level 1", caption="welcome to the dungeon!"})
+
 end -- levels:init
 
-function levels:add(cx1,cy1)
-	-- initialize the level object
-	-- with initial coordinates
-	-- from the top-left block
-	local lvl={
-		cx1=cx1,x1=cx1*8,
-		cy1=cy1,y1=cy1*8
-	}
-	-- x/y = pixel coords
-	-- cx/cy = map cell coords
-
-	-- determine level bounds
-	-- set the pixel bounds in x/y
-	-- and cell bounds as cx/cy
-	for cx2=cx1,127 do
-		if mget(cx2,cy1)==9 then
-			lvl.cx2=cx2
-			lvl.x2=cx2*8
-			break
-		end
-	end
-
-	for cy2=cy1,63 do
-		if mget(cx1,cy2)==7 then
-			lvl.cy2=cy2
-			lvl.y2=cy2*8
-			break
-		end
-	end
-
+function levels.setup(lvl)
+  local cx1,cy1=lvl.cx1,lvl.cy1
+  -- initialize the level object
+  -- with initial coordinates
+  -- from the top-left block
+  -- x/y = pixel coords
+  -- cx/cy = map cell coords
+  lvl.x1=cx1*8
+  lvl.y1=cy1*8
 
   lvl.plantable=0
   lvl.planted=0
+  lvl.percent_complete=0
 
+  -- determine level bounds
+  -- set the pixel bounds in x/y
+  -- and cell bounds as cx/cy
+  for cx2=cx1,127 do
+    if mget(cx2,cy1)==9 then
+      lvl.cx2=cx2
+      lvl.x2=cx2*8
+      break
+    end
+  end
+
+  for cy2=cy1,63 do
+    if mget(cx1,cy2)==7 then
+      lvl.cy2=cy2
+      lvl.y2=cy2*8
+      break
+    end
+  end
 
   for y=cy1,lvl.cy2 do
     for x=cx1,lvl.cx2 do
@@ -328,13 +342,10 @@ function levels:add(cx1,cy1)
   end
 
   -- get closed door location, if there
-	levels:set_spawn(lvl)
-
-	lvl.percent_complete=0
-	add(self.list,lvl)
+  levels.set_spawn(lvl)
 end
 
-function levels:set_spawn(lvl)
+function levels.set_spawn(lvl)
 	-- find start sprite (#64) and
 	-- set initial x/y position
 	for i=lvl.x1/8,lvl.x2/8 do
@@ -501,8 +512,7 @@ function levelcomplete:update()
       return
     end
 
-		reset_game()
-    banners:add({title="level "..levels.index})
+		reset_level()
     for line in all(self.lines) do
       line.dt=1
 			for _,char in pairs(line.chars) do
@@ -688,7 +698,7 @@ function player:update()
 	if player.dying then
 		if player.dying_timer==0 then
 			player.vx=0
-		 if gamestate=="game" then reset_game() end
+		 if gamestate=="game" then reset_level() end
 		else
 			player.dying_timer-=1
 		end
@@ -1439,7 +1449,7 @@ end
 function intro:update()
 	if btnp(2) then
 		gamestate="game"
-		reset_game()
+		reset_level()
 		music(0)
 	end
 
@@ -1657,7 +1667,7 @@ end
 
 function outro:update()
 	if btnp(4) then
-		reset_game()
+		reset_level()
 		gamestate="intro"
 	end
 end
@@ -1760,14 +1770,14 @@ c00700800a00000000000000b8888888000010000110100000001100111000000000000000000000
 0b00300b003000000b0b000008888888111110100001100000001110010110000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000b000b00008888888001100000011110000001100001111000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000400400008888888011111100111111000011110011111100000000000000000000000000000000000000000000000000000000000000000
-dddddddd33b3333b0000000000666600000660000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd33333b338888888806666660066336600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd3b33b3338888888806444460063333600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd3d3333338888888866444466663333660000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd5d3535d38888888864444446633333360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd553555558888888864444a46633333360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd563dd5d58888888864444446633333360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-dddddddd555555558888888864444446633333360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd33b3333b0000000000333300000aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd33333b3388888888033333300aaaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd3b33b33388888888033333300aaaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd3d3333338888888833333333aaaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd5d3535d38888888833333333aaaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd5535555588888888333aa333aaaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd563dd5d58888888833aaaa33aaaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+dddddddd555555558888888833aaaa33aaaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 07700070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 07770070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
