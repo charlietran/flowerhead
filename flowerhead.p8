@@ -8,8 +8,24 @@ __lua__
 --
 -- enemies
 
-debug=true
-menuitem(1,"toggle debugging", function() debug=not debug end)
+toggles={
+	bee_move=true
+}
+function make_toggle(name,index)
+	menuitem(index,name..": "..(toggles[name] and 1 or 0), function()
+		toggles[name] = not toggles[name]
+		make_toggle(name,index)
+	end)
+end
+
+make_toggle("performance",1)
+make_toggle("path_vis",2)
+make_toggle("a_star",3)
+make_toggle("bee_move",4)
+menuitem(5,"spawn bee", function()
+	bees:add(levels.current.x2-8,levels.current.y2-8)
+end)
+
 
 function _init()
 	-- how many pixels per frame
@@ -105,7 +121,7 @@ function _draw()
 	else
 		_drawgame()
 	end
-  if(debug) draw_debug()
+  if(toggles.performance) draw_debug()
 end
 
 function draw_debug()
@@ -161,7 +177,7 @@ function reset_level()
 
   if not levels.current.started then
     levels.current.started=true
-    banners:add(levels.current.banner)
+    --banners:add(levels.current.banner)
   else
     truncate(grasses.map)
     truncate(bombs.list)
@@ -271,6 +287,14 @@ levels.list[2]={
     caption="plant some flowers!"
   }
 }
+levels.list[3]={
+  cx1=94,cy1=28,
+  enemies_disabled=true,timer_disabled=true,
+  banner={
+    title="level 3",
+    caption=""
+  }
+}
 
 -- find each level block, add
 -- it to the list with coords
@@ -375,9 +399,12 @@ function levels:update()
 		return false
 	end
 	local c=self.current
-  c.frame+=1/16
-  if(c.frame==5) c.frame=0
-  mset(c.doorx,c.doory,36+c.frame)
+
+	if c.dooropen then
+		c.frame+=1/16
+		if(c.frame==5) c.frame=0
+		mset(c.doorx,c.doory,36+c.frame)
+	end
 
 	if not c.dooropen and c.planted/c.plantable>=1 then
     c.dooropen=true
@@ -510,6 +537,7 @@ function levelcomplete:update()
 	if btnp(4) then
 		levels.index+=1
 		levels.current=levels.list[levels.index]
+		truncate(bees.list)
 
     if not levels.current then
       gamestate="outro"
@@ -1160,7 +1188,7 @@ function is_spike(tile)
 end
 
 function is_exit(tile)
-  return tile==36
+  return tile>=36 and tile<=40
 end
 
 --effects-----------------------
@@ -1562,6 +1590,7 @@ end
 --track the player within our
 --specified threshold
 function cam:update()
+	if(gamestate~="game") return
 	self.shake_remaining=max(0,self.shake_remaining-1)
 
 	-- if the camera is too far to
@@ -1617,98 +1646,159 @@ function cam:draw()
 	camera(cam:position())
 end
 
---the BEES----------------------
+--the bees----------------------
 --------------------------------
 bees={
   list={},
   paths={},
-	update_interval=60
+	update_interval=15
 }
 
 function bees:init()
-  bees:add(60,40)
-  bees:add(68,40)
 end
 
 function bees:update()
   local time=t()
   for _,bee in pairs(bees.list) do
+		bee.cx=flr(bee.x/8)
+		bee.cy=flr(bee.y/8)
 		bee.update_counter+=1
 		if bee.update_counter == bees.update_interval then
 			bee:pathfinding()
 			bee.update_counter=0
 		end
-		--bee:move()
+		bee:animate()
+		if toggles.bee_move then
+			bee:move()
+		end
 	end
 end
 
-function bees.move(bee)
+function bees.animate(bee)
 	bee.frame+=0.25
 	if(bee.frame>2) bee.frame=0
+end
 
-	local xdir = player.x<bee.x and -1 or 1
-	local ydir = player.y<bee.y and -1 or 1
+function bees.move(bee)
+	local path_index=1
+
+	local next_cell = bee.path[path_index]
+	if not next_cell then
+		return
+	end
+
+	while (bee.cx == next_cell[1] and bee.cy == next_cell[2] and path_index < #bee.path) do
+		path_index+=1
+		printh("using path: "..path_index)
+		next_cell = bee.path[path_index]
+	end
+
+	local targetx = next_cell[1]*8+4
+	local targety = next_cell[2]*8+4
+
+	if not next_cell then
+		printh("no next cell")
+		return
+	end
+
+	local xdir = targetx<bee.x and -1 or 1
+	local ydir = targety<bee.y and -1 or 1
+
 	local xstep,ystep = xdir*bee.vx,ydir*bee.vy
 
-	--if abs(player.x-bee.x) > 3 then
 	if collide(bee,'x',xstep) then
 	else
 		bee.x += xstep
 	end
-	--end
-	bee.flipx = xdir==-1
+	bee.flipx = next_cell[1] < bee.cx
 
-	--if abs(player.y-bee.y) > 3 then
-	if collide(bee,'y',ystep) then
+	local time=t()
+	local offset=sin(time)
+	if collide(bee,'y',ystep+offset) then
 	else
-		bee.y += ystep
-		bee.y+=sin(time)*(0.5)
+		bee.y += ystep + offset
 	end
-	--end
+
+	if bee.x + bee.wr > player.x - player.wr and
+		bee.x - bee.wr < player.x + player.wr and
+		bee.y + bee.hr > player.y - player.hr and
+		bee.y - bee.hr < player.y + player.hr and
+		not player.dying then
+		player:die()
+		bee.x=60
+		bee.y=40
+	end
 end
 
 function bees:draw()
-  for _,bee in pairs(self.list) do
-    spr(
-      24+bee.frame,
-      bee.x-bee.wr,bee.y-bee.hr,
-      1,1,
-      bee.flipx)
+	for _,bee in pairs(self.list) do
+		spr(
+		24+bee.frame,
+		bee.x-bee.wr,bee.y-bee.hr,
+		1,1,
+		bee.flipx)
 
-		for cell in all(bee.visited) do
-			pset(cell[1]*8,cell[2]*8,3)
-		end
+		if toggles.path_vis then
 
-		for cell in all(bee.path) do
-			pset(cell[1]*8,cell[2]*8,7)
+			local points={}
+			for cell in all(bee.visited) do
+				add(points,{cell[1]*8+4,cell[2]*8+4})
+			end
+
+			for i=2,#points do
+				local x1=points[i-1][1]
+				local y1=points[i-1][2]
+				local x2=points[i][1]
+				local y2=points[i][2]
+				line(x1,y1,x2,y2,3)
+			end
+
+			local points={}
+			for cell in all(bee.path) do
+				add(points,{cell[1]*8+4,cell[2]*8+4})
+			end
+
+			for i=2,#points do
+				local x1=points[i-1][1]
+				local y1=points[i-1][2]
+				local x2=points[i][1]
+				local y2=points[i][2]
+				line(x1,y1,x2,y2,7)
+			end
 		end
-  end
+	end
 end
 
--- Manhattan distance between start and end
+-- manhattan distance between start and end
 function bees:distance(start, target)
 	return abs(start[1]-target[1]) + abs(start[2]-target[2])
 end
 
--- Takes a list of frontier nodes to visit
+-- takes a list of frontier nodes to visit
 -- and returns the one with the minimum
 -- node.cost + distance(node, target)
-function bees:choose_next(frontier)
-	if not a_star then
+function bees:choose_next(frontier, goal_cell)
+	if not toggles.a_star then
 		return pop_end(frontier)
 	end
 
 	best_cost = 128*2
 	next_node = nil
 	for _,node in pairs(frontier) do
-
+		local current_distance = node.cost + bees:distance(node.cell,goal_cell)
+		if current_distance < best_cost then
+			best_cost = current_distance
+			next_node = node
+		end
 	end
+	del(frontier,next_node)
+	return next_node
 end
 
 -- pathfinding logic for finding optimal route to player
 function bees.pathfinding(bee)
   -- get the cell coordinate of the player
-  local goal=pos_to_cell(player.x,player.y)
+  local goal=pos_to_cell(player.x+player.wr,player.y+player.hr)
   local goal_index=cell_to_index(goal)
 
 
@@ -1718,7 +1808,7 @@ function bees.pathfinding(bee)
 
 	local frontier={{cell=start, cost=0}}
 	local came_from={}
-	came_from[start_index]="none"
+	came_from[start_index]={cell=start,cost=0}
 
 	local current,neighbors
 	local count=0
@@ -1731,31 +1821,29 @@ function bees.pathfinding(bee)
 		--printh("frontier length: "..#frontier)
 		count+=1
 		--current=choose_next(frontier)
-		current=bees:choose_next(frontier)
+		current=bees:choose_next(frontier,goal)
 		add(bee.visited,current.cell)
 		--printh("searching at: "..current[1]..","..current[2])
 		--mset(current[1],current[2],34)
-		neighbors=bees.get_neighbors(current.cell)
+		neighbors=bees.get_neighbors(current.cell,came_from)
 
 		for neighbor in all(neighbors) do
 			local neighbor_index=cell_to_index(neighbor)
-			if came_from[neighbor_index]==nil then
-				insert(frontier,{cell=neighbor, cost=current.cost+1})
-				came_from[neighbor_index]=current
-			end
+			insert(frontier,{cell=neighbor, cost=current.cost+1})
+			came_from[neighbor_index]=current
 			if neighbor_index==goal_index then
-				printh("FOUND PLAYER IN: "..count)
+				--printh("found player in: "..count)
 				found=true
 				break
 			end
 		end
 	end
 
+	current=came_from[goal_index]
 	if not current then
 		return
 	end
-
-	current=came_from[goal_index].cell
+	current = current.cell
 	bee.path={current}
 	local path_index=cell_to_index(current)
 
@@ -1764,24 +1852,27 @@ function bees.pathfinding(bee)
 		current = came_from[path_index].cell
 		path_index = cell_to_index(current)
 	end
+	add(bee.path,goal)
 end
 
-function bees.get_neighbors(pos)
+function bees.get_neighbors(pos,came_from)
   local neighbors={}
   local lvl=levels.current
 	local x,y=pos[1],pos[2]
 
-	if x>lvl.cx1 and not iswall(mget(x-1,y)) then
-		add(neighbors,{x-1,y})
-	end
-	if x<lvl.cx2 and not iswall(mget(x+1,y)) then
-		add(neighbors,{x+1,y})
-	end
-	if y>lvl.cy1 and not iswall(mget(x,y-1)) then
-		add(neighbors,{x,y-1})
-	end
-	if y<lvl.cy2 and not iswall(mget(x,y+1)) then
-		add(neighbors,{x,y+1})
+	for i=-1,1 do
+		for j=-1,1 do
+			local newx,newy=x+i,y+j
+			local neighbor_index=cell_to_index({newx,newy})
+			if not came_from[neighbor_index] and
+				not (i==0 and j==0) and
+				newx>lvl.cx1 and newx<lvl.cx2 and
+				newy>lvl.cy1 and newy<lvl.cy2 and
+				not iswall(mget(newx,newy))
+			then
+				add(neighbors,{newx,newy})
+			end
+		end
 	end
 
   return neighbors
@@ -1789,6 +1880,7 @@ end
 
 function bees:add(x,y)
   local bee={
+		bee=true,
     x=x,
     y=y,
     vx=0.5,
@@ -1801,13 +1893,14 @@ function bees:add(x,y)
 		path={},
 		update_counter=0,
 		pathfinding=bees.pathfinding,
-		move=bees.move
+		move=bees.move,
+		animate=bees.animate
   }
   add(self.list, bee)
 end
 
 function bees.die(bee)
-  del(bees.list, bee)
+  --del(bees.list, bee)
 end
 
 
@@ -2014,14 +2107,14 @@ dddddddd5d3535d3888888884c5c5c5447cc66644c666cc4466ccc744ccc77c44c77cc6400000000
 dddddddd55355555888888884c5c5c54477cccc44cccccc44cccc7744cc7777447777cc400000000000000000000000000000000000000000000000000000000
 dddddddd563dd5d5888888884c5c5c5446ccccc44cccccc44ccccc644ccc66c44c66ccc400000000000000000000000000000000000000000000000000000000
 dddddddd55555555888888884c5c5c544cccccc44cccccc44cccccc44cccccc44cccccc400000000000000000000000000000000000000000000000000000000
-00700000000000000000000000000000000000000000000000000000000000000000000000000000000000000004400000044000000000000000000000000000
-07700070000000000000000000000000000000000000000000000000000000000000000000000000000000000444444004499440000000000000000000000000
-077700700000000000000000000000000000000000000000000000000000000000000000000000000000000004a5a540049aa940000000000000000000000000
-577756770000000000000000000000000000000000000000000000000000000000000000000000000000000044a5a54444aaa944000000000000000000000000
-567756760000000000000000000000000000000000000000000000000000000000000000000000000000000045a5a5a44aaaaa94000000000000000000000000
-567656660000000000000000000000000000000000000000000000000000000000000000000000000000000045a5a5a44aaaaa94000000000000000000000000
-566655550000000000000000000000000000000000000000000000000000000000000000000000000000000045a5a5a44aaaaa94000000000000000000000000
-555555550000000000000000000000000000000000000000000000000000000000000000000000000000000045a5a5a44aaaaa94000000000000000000000000
+00700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07700070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07770070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+57775677000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+56775676000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+56765666000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+56665555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+55555555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00e0000000e0000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000e00000005550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 66600000060000006660000000000000050055000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2258,7 +2351,7 @@ __map__
 0200000000000000000000000000000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
 0200000000000000000000000000000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
 0200000000000000000000000000000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
-0200000000000001010100000000000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
+0200000001000001010100000100000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
 0200000001000000000000000100000402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
 0240000001303030303030300100240402313131313131313131313131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
 0703030303030303030303030303030602234031313131310101010131313104000000000000000000000000000000000000000000000031313131313131313131313131313131000000000000000000000000003131313131313131313131313131000000000000000000000000000000000031313131313131313131313131
