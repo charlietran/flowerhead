@@ -8,24 +8,12 @@ __lua__
 --
 -- enemies
 
-toggles={
-	bee_move=true
+game_modes={
+	intro={is_intro=true},
+	game={is_game=true},
+	lvl_complete={ is_lvl_complete=true,lines={} },
+	outro={is_outro=true},
 }
-function make_toggle(name,index)
-	menuitem(index,name..": "..(toggles[name] and 1 or 0), function()
-		toggles[name] = not toggles[name]
-		make_toggle(name,index)
-	end)
-end
-
-make_toggle("performance",1)
-make_toggle("path_vis",2)
-make_toggle("a_star",3)
-make_toggle("bee_move",4)
-menuitem(5,"spawn bee", function()
-	bees:add(levels.current.x2-8,levels.current.y2-8)
-end)
-
 
 function _init()
 	-- how many pixels per frame
@@ -51,18 +39,18 @@ function _init()
 
   coroutines={}
 
-	-- gamestate starts in "intro"
+	-- current_game_mode starts in "intro"
 	-- and then move into "game"
 	-- and then "end"
-	gamestate="intro"
-	intro:init()
+	current_game_mode=game_modes.intro
+	game_modes.intro:init()
 
 	-- holds all objects that exist
 	-- in the game loop. each object
 	-- should have :update and :draw
 	-- set up our objects table
 	-- in draw order
-	objects={
+	world={
 		clouds,
 		cam,
 		levels,
@@ -73,25 +61,18 @@ function _init()
 		specks,
 		bombs,
 		explosions,
-		levelcomplete,
     banners
 	}
 
-	for _,object in pairs(objects) do
+	-- init everything that has an init func
+	for _,object in pairs(world) do
 		if object.init then object:init() end
 	end
 end
 
 function _update60()
   run_coroutines()
-
-	if gamestate=="intro" then
-		intro:update()
-	elseif gamestate=="outro" then
-		outro:update()
-	else
-		_updategame()
-	end
+	current_game_mode:update()
 end
 
 function run_coroutines()
@@ -104,9 +85,9 @@ function run_coroutines()
   end
 end
 
-function _updategame()
+function game_modes.game:update()
 	gametime+=1
-	for _,object in pairs(objects) do
+	for _,object in pairs(world) do
     -- update the camera position before everything else
 		cam:update()
 		if object.update then object:update() end
@@ -114,13 +95,7 @@ function _updategame()
 end
 
 function _draw()
-	if gamestate=="intro" then
-		intro:draw()
-	elseif gamestate=="outro" then
-		outro:draw()
-	else
-		_drawgame()
-	end
+	current_game_mode:draw()
   if(toggles.performance) draw_debug()
 end
 
@@ -133,10 +108,10 @@ function draw_debug()
   cam.x-62,cam.y+57,7)
 end
 
-function _drawgame()
+function game_modes.game:draw()
   cls()
 
-  for _,object in pairs(objects) do
+  for _,object in pairs(world) do
     if object.draw then object:draw() end
   end
 
@@ -170,14 +145,14 @@ clouds.list={}
 function reset_level()
 	player:init()
 	cam.fadeout=1
-	grasses.map={}
-	levels.current.percent_complete=0
-	levels.current.planted=0
 	gametime=0
 
   if not levels.current.started then
     levels.current.started=true
-    --banners:add(levels.current.banner)
+		banners:add(levels.current.banner)
+		grasses.map={}
+		levels.current.percent_complete=0
+		levels.current.planted=0
   else
     truncate(grasses.map)
     truncate(bombs.list)
@@ -351,7 +326,7 @@ function levels.setup(lvl)
       local at=mget(x,y-1)
       -- if a static block or floor block, add to plantable
       if t==1 or t==3 then
-        if not iswall(at) and at~=35 and at~=36 and not is_spike(at) then
+        if not is_wall(at) and at~=35 and at~=36 and not is_spike(at) then
           lvl.plantable+=8
         end
       end
@@ -395,9 +370,6 @@ function levels:draw()
 end
 
 function levels:update()
-	if gamestate ~= "game" then
-		return false
-	end
 	local c=self.current
 
 	if c.dooropen then
@@ -406,10 +378,24 @@ function levels:update()
 		mset(c.doorx,c.doory,36+c.frame)
 	end
 
-	if not c.dooropen and c.planted/c.plantable>=1 then
+	if not c.dooropen and not c.exited and c.planted/c.plantable>=1 then
     c.dooropen=true
     mset(c.doorx,c.doory,36)
 	end
+end
+
+function levels:goto_next()
+	self.index+=1
+	self.current=self.list[self.index]
+
+	if not self.current then
+		current_game_mode=game_modes.outro
+		return
+	end
+
+	current_game_mode=game_modes.game
+	truncate(bees.list)
+	reset_level()
 end
 
 banners={list={}}
@@ -476,73 +462,58 @@ function banners:draw()
   end
 end
 
-levelcomplete={lines={}}
-levelcomplete.lines[1]={
-	y1=-5,y2=40,
-	duration=40,dt=1,
-	text="level complete",
-	chars={}
-}
-
-levelcomplete.lines[2]={
-	y1=-5,y2=50,
-	duration=40,dt=1,
-	text="press z",
-	chars={}
-}
-
-function levelcomplete:init()
-	for line in all(self.lines) do
-		line.dt=1
-    local xc=64-#line.text*3
-		for i=1,#line.text do
-			local char={}
-			local offset=(i-1)*10
-			char.string=sub(line.text,i,i)
-
-      char.x1=xc
-      char.dx=xc + (6*(i-1)) - xc
-      char.y1=line.y1-offset
-      char.dy=line.y2-(line.y1-offset)
-
-			char.x=char.x1
-			char.y=char.y1
-			line.chars[i]=char
-		end
-	end
-end
-
-function levelcomplete:start()
-	gamestate="lvlcomplete"
+function game_modes.lvl_complete:start()
+	current_game_mode=game_modes.lvl_complete
+	levels.current.exited=true
 	player.vx=0
+	self.anim_timer=0
+	self.curtain_x,self.curtain_y=0,0
+	self.box1={x=cam.x-64,y=cam.y-64-127,w=127,h=127,color=1}
+	self.box2={x=cam.x-64,y=cam.y+64,w=127,h=127,color=1}
+	add(coroutines,cocreate(
+		make_animation(self.box1,{x=cam.x-64,y=player.y-15-127,duration=30})
+	))
+
+	add(coroutines,cocreate(
+		make_animation(self.box2,{x=cam.x-64,y=player.y+15,duration=30})
+	))
 	music(10)
 end
 
-function levelcomplete:update()
-	if gamestate~="lvlcomplete" then
-		return false
-	end
+function game_modes.lvl_complete.animate_boxes()
+	printh('curtain')
+end
 
-	for line in all(self.lines) do
-		if line.dt < line.duration then
-			line.dt+=1
-			local t=line.dt/line.duration
-			for _,char in pairs(line.chars) do
-				char.x=char.x1+ease_out_quad(t)*char.dx
-				char.y=char.y1+ease_out_quad(t)*char.dy
-			end
-		end
-	end
-
+function game_modes.lvl_complete:update()
+	levels:update()
 	if btnp(4) then
-		levels.index+=1
-		levels.current=levels.list[levels.index]
-		truncate(bees.list)
+		music(0)
+		levels:goto_next()
+	end
+end
 
-    if not levels.current then
-      gamestate="outro"
-      return
-    end
+function game_modes.lvl_complete:draw()
+	cls()
+	clouds:draw()
+	cam:draw()
+	map(
+		levels.current.doorx,levels.current.doory,
+		levels.current.doorx*8,levels.current.doory*8,
+		1,1)
+	player:draw()
+	bees:draw()
+	rectfill(
+		self.box1.x,self.box1.y,
+		self.box1.x+self.box1.w,self.box1.y+self.box1.h,
+		self.box1.color
+	)
+	rectfill(
+		self.box2.x,self.box2.y,
+		self.box2.x+self.box2.w,self.box2.y+self.box2.h,
+		self.box2.color
+	)
+end
+
 
 		reset_level()
     for line in all(self.lines) do
@@ -644,6 +615,7 @@ function player:init()
 	player.dying_timer=0
 
 	player.spr=64
+
 	--sprite numbers------
 	--64 standing
 	--65 running 1
@@ -732,7 +704,7 @@ function player:update()
 	if player.dying then
 		if player.dying_timer==0 then
 			player.vx=0
-		 if gamestate=="game" then reset_level() end
+		 if current_game_mode.is_game then reset_level() end
 		else
 			player.dying_timer-=1
 		end
@@ -770,7 +742,7 @@ function player:checksliding()
 end
 
 function player:handleinput()
-	if gamestate~="game" then return end
+	if(not current_game_mode.is_game) return
 	if self.standing then
 		self:groundinput()
 	else
@@ -896,7 +868,6 @@ function player.movex(p)
 			--move if we didn't hit
 			p.x+=step
 		end
-
 	end
 end --player.movex
 
@@ -1149,8 +1120,11 @@ function collide(e,a,d,nearonly)
 	local tile2=mget(x2/8,y2/8)
 
 
-  if gamestate=="game" and e.player and (is_exit(tile1) or is_exit(tile2)) then
-    levelcomplete:start()
+  if current_game_mode.is_game and
+		e.player and
+		(is_open_exit(tile1) or is_open_exit(tile2))
+		then
+    game_modes.lvl_complete:start()
   end
 
   if is_spike(tile1) or is_spike(tile2) then
@@ -1160,13 +1134,13 @@ function collide(e,a,d,nearonly)
 	-- "nearonly" indicates we only
 	-- want to know if our near
 	-- corner will be in a wall
-	if nearonly and iswall(tile1) and (tile1!=2 or y1%8<4) then
+	if nearonly and is_wall(tile1) and (tile1!=2 or y1%8<4) then
 		return true
 	end
 
 	--if not nearonly, check if
 	--either corner will hit a wall
-	if not nearonly and (iswall(tile1) or iswall(tile2)) then
+	if not nearonly and (is_wall(tile1) or is_wall(tile2)) then
 		return true
 	end
 
@@ -1177,7 +1151,7 @@ function collide(e,a,d,nearonly)
 	return false
 end
 
-function iswall(tile)
+function is_wall(tile)
  --we know our tile sprites
  --our stored in slots 1-10
  return tile>=1 and tile<=15
@@ -1187,7 +1161,11 @@ function is_spike(tile)
 	return tile==48
 end
 
-function is_exit(tile)
+function is_closed_exit(tile)
+	return tile==35
+end
+
+function is_open_exit(tile)
   return tile>=36 and tile<=40
 end
 
@@ -1211,7 +1189,7 @@ function specks:update()
 			del(self.list,speck)
 		end
 
-    if gamestate=="game" and iswall(mget(speck.x/8,speck.y/8)) then
+    if current_game_mode.is_game and is_wall(mget(speck.x/8,speck.y/8)) then
 			del(self.list,speck)
     end
 	end
@@ -1295,11 +1273,11 @@ function grasses.updatetile(cx,cy)
 end
 
 function is_plantable(tile1,tile2)
-	return iswall(tile2)
-          and tile1~=48
-          and tile1~=35
-          and tile1~=36
-          and not iswall(tile1)
+	return is_wall(tile2)
+          and not is_spike(tile1)
+          and not is_closed_exit(tile1)
+          and not is_open_exit(tile1)
+          and not is_wall(tile1)
 end
 
 
@@ -1467,21 +1445,20 @@ end
 
 --intro object------------------
 --------------------------------
-intro={}
-intro.a=0
-intro.r=2
-intro.title="flowerhead"
-intro.prompt="press up to start"
 
-function intro:init()
-	music(1)
+function game_modes.intro:init()
+	self.a=0
+	self.r=2
+	self.title="flowerhead"
+	self.prompt="press up to start"
   self.animtimer=0
   self.animlength=8
+	music(1)
 end
 
-function intro:update()
+function game_modes.intro:update()
 	if btnp(2) then
-		gamestate="game"
+		current_game_mode=game_modes.game
 		reset_level()
 		music(0)
 	end
@@ -1502,7 +1479,7 @@ function intro:update()
   end
 end
 
-function intro:draw()
+function game_modes.intro:draw()
   cls()
   specks:draw()
   map(0,48,0,0,16,16)
@@ -1557,8 +1534,8 @@ function intro:draw()
 	-- in a static position
   if self.animtimer < 6 then
 	print(
-    intro.prompt,
-		64-#intro.prompt*2,
+    self.prompt,
+		64-#self.prompt*2,
 		80,
 		7
 	)
@@ -1590,7 +1567,7 @@ end
 --track the player within our
 --specified threshold
 function cam:update()
-	if(gamestate~="game") return
+	if(not current_game_mode.is_game) return
 	self.shake_remaining=max(0,self.shake_remaining-1)
 
 	-- if the camera is too far to
@@ -1868,7 +1845,7 @@ function bees.get_neighbors(pos,came_from)
 				not (i==0 and j==0) and
 				newx>lvl.cx1 and newx<lvl.cx2 and
 				newy>lvl.cy1 and newy<lvl.cy2 and
-				not iswall(mget(newx,newy))
+				not is_wall(mget(newx,newy))
 			then
 				add(neighbors,{newx,newy})
 			end
@@ -1961,7 +1938,7 @@ end
 function outro:update()
 	if btnp(4) then
 		reset_level()
-		gamestate="intro"
+		current_game_mode=game_modes.intro
 	end
 end
 
@@ -2030,6 +2007,7 @@ end
 
 -- create an animation function to be
 -- used in a coroutine
+-- params: {x, y, duration, easing}
 function make_animation(obj,params)
   return function()
     local x1,y1,x2,y2,dx,dy,duration,easing,percent
@@ -2081,6 +2059,31 @@ end
 function linear(t)
   return t
 end
+
+toggles={
+	bee_move=true,
+	a_star=true
+}
+function make_toggle(name,index)
+	menuitem(index,name..": "..(toggles[name] and 1 or 0), function()
+		toggles[name] = not toggles[name]
+		make_toggle(name,index)
+	end)
+end
+
+make_toggle("performance",1)
+make_toggle("path_vis",2)
+make_toggle("a_star",3)
+make_toggle("bee_move",4)
+
+menuitem(5,"spawn bee", function()
+	bees:add(levels.current.x2-8,levels.current.y2-8)
+end)
+
+menuitem(5,"next level", function()
+	levels:goto_next()
+end)
+
 
 __gfx__
 00000000555555550005555555555555555550000000000055555000000555550000000000000000333333330000000033333333000000000000000000000000
