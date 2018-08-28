@@ -44,30 +44,12 @@ function _init()
 	-- and then "end"
 	current_game_mode=game_modes.intro
 	game_modes.intro:init()
-
-	-- holds all objects that exist
-	-- in the game loop. each object
-	-- should have :update and :draw
-	-- set up our objects table
-	-- in draw order
-	world={
-		clouds,
-		cam,
-		levels,
-		tutorials,
-		grasses,
-		player,
-    bees,
-		specks,
-		bombs,
-		explosions,
-    banners
-	}
-
-	-- init everything that has an init func
-	for _,object in pairs(world) do
-		if object.init then object:init() end
-	end
+	clouds:init()
+	cam:init()
+	levels:init()
+	tutorials:init()
+	player:init()
+	bees:init()
 end
 
 function _update60()
@@ -87,11 +69,13 @@ end
 
 function game_modes.game:update()
 	gametime+=1
-	for _,object in pairs(world) do
-    -- update the camera position before everything else
-		cam:update()
-		if object.update then object:update() end
-	end
+	cam:update()
+	levels:update()
+	player:update()
+	bees:update()
+	specks:update()
+	bombs:update()
+	explosions:update()
 end
 
 function _draw()
@@ -111,11 +95,17 @@ end
 function game_modes.game:draw()
   cls()
 
-  for _,object in pairs(world) do
-    if object.draw then object:draw() end
-  end
-
-  -- rectfill(cam.x-61, cam.y-64, cam.x-44,cam.y-59, 11)
+	clouds:draw()
+	cam:draw()
+	levels:draw()
+	tutorials:draw()
+	grasses:draw()
+	player:draw()
+	bees:draw()
+	specks:draw()
+	bombs:draw()
+	explosions:draw()
+	banners:draw()
 
   local percent=(levels.current.planted / levels.current.plantable)*100
 
