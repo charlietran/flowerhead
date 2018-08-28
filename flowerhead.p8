@@ -16,6 +16,7 @@ game_modes={
 }
 
 function _init()
+	printh("------ starting ------\n")
 	-- how many pixels per frame
 	-- should our y velocity
 	-- decrease when falling
@@ -49,7 +50,6 @@ function _init()
 	levels:init()
 	tutorials:init()
 	player:init()
-	bees:init()
 end
 
 function _update60()
@@ -100,8 +100,8 @@ function game_modes.game:draw()
 	levels:draw()
 	tutorials:draw()
 	grasses:draw()
-	player:draw()
 	bees:draw()
+	player:draw()
 	specks:draw()
 	bombs:draw()
 	explosions:draw()
@@ -575,7 +575,9 @@ function entity_class:animate()
 	sspr(
 		self.spr_x + flr(self.anim.timer)*self.w,self.spr_y,
 		self.w,self.h,
-		self.x-self.wr,self.y-self.hr
+		self.x-self.wr,self.y-self.hr,
+		self.w,self.h,
+		self.flipx
 	)
 end
 
@@ -1573,260 +1575,95 @@ end
 --------------------------------
 bees={
   list={},
-  paths={},
 	update_interval=15
 }
 
-function bees:init()
-end
-
 function bees:update()
-  local time=t()
   for _,bee in pairs(bees.list) do
-		bee.cx=flr(bee.x/8)
-		bee.cy=flr(bee.y/8)
 		bee.update_counter+=1
 		if bee.update_counter == bees.update_interval then
-			bee:pathfinding()
 			bee.update_counter=0
+			bee.pathfinder:update(player)
 		end
-		bee:animate()
+			bee.cx=flr(bee.x/8)
+			bee.cy=flr(bee.y/8)
+			bee.pathfinder:aim(bee)
 		if toggles.bee_move then
+			bee:jitter()
 			bee:move()
 		end
 	end
 end
 
-function bees.animate(bee)
-	bee.frame+=0.25
-	if(bee.frame>2) bee.frame=0
-end
-
-function bees.move(bee)
-	local path_index=1
-
-	local next_cell = bee.path[path_index]
-	if not next_cell then
-		return
-	end
-
-	while (bee.cx == next_cell[1] and bee.cy == next_cell[2] and path_index < #bee.path) do
-		path_index+=1
-		printh("using path: "..path_index)
-		next_cell = bee.path[path_index]
-	end
-
-	local targetx = next_cell[1]*8+4
-	local targety = next_cell[2]*8+4
-
-	if not next_cell then
-		printh("no next cell")
-		return
-	end
-
-	local xdir = targetx<bee.x and -1 or 1
-	local ydir = targety<bee.y and -1 or 1
-
-	local xstep,ystep = xdir*bee.vx,ydir*bee.vy
-
-	if collide(bee,'x',xstep) then
-	else
-		bee.x += xstep
-	end
-	bee.flipx = next_cell[1] < bee.cx
-
+function bees:jitter()
 	local time=t()
-	local offset=sin(time)
-	if collide(bee,'y',ystep+offset) then
-	else
-		bee.y += ystep + offset
-	end
-
-	if bee.x + bee.wr > player.x - player.wr and
-		bee.x - bee.wr < player.x + player.wr and
-		bee.y + bee.hr > player.y - player.hr and
-		bee.y - bee.hr < player.y + player.hr and
-		not player.dying then
-		player:die()
-		bee.x=60
-		bee.y=40
-	end
+	local offset=sin(time)*0.3
+	self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
 
 function bees:draw()
 	for _,bee in pairs(self.list) do
-		spr(
-		24+bee.frame,
-		bee.x-bee.wr,bee.y-bee.hr,
-		1,1,
-		bee.flipx)
-
-		if toggles.path_vis then
-
-			local points={}
-			for cell in all(bee.visited) do
-				add(points,{cell[1]*8+4,cell[2]*8+4})
-			end
-
-			for i=2,#points do
-				local x1=points[i-1][1]
-				local y1=points[i-1][2]
-				local x2=points[i][1]
-				local y2=points[i][2]
-				line(x1,y1,x2,y2,3)
-			end
-
-			local points={}
-			for cell in all(bee.path) do
-				add(points,{cell[1]*8+4,cell[2]*8+4})
-			end
-
-			for i=2,#points do
-				local x1=points[i-1][1]
-				local y1=points[i-1][2]
-				local x2=points[i][1]
-				local y2=points[i][2]
-				line(x1,y1,x2,y2,7)
-			end
-		end
+		if(toggles.path_vis) bees.draw_paths(bee)
+		bee:animate()
 	end
 end
 
--- manhattan distance between start and end
-function bees:distance(start, target)
-	return abs(start[1]-target[1]) + abs(start[2]-target[2])
-end
-
--- takes a list of frontier nodes to visit
--- and returns the one with the minimum
--- node.cost + distance(node, target)
-function bees:choose_next(frontier, goal_cell)
-	if not toggles.a_star then
-		return pop_end(frontier)
-	end
-
-	best_cost = 128*2
-	next_node = nil
-	for _,node in pairs(frontier) do
-		local current_distance = node.cost + bees:distance(node.cell,goal_cell)
-		if current_distance < best_cost then
-			best_cost = current_distance
-			next_node = node
+function bees.draw_paths(bee)
+		for cell in all(bee.visited) do
+			local px,py=cell[1][1]*8,cell[1][2]*8
+			fillp(0b0000111100001111)
+			rectfill(px,py, px+7,py+7,3)
+			fillp()
+			print(cell[2],px,py+2,11)
 		end
-	end
-	del(frontier,next_node)
-	return next_node
-end
 
--- pathfinding logic for finding optimal route to player
-function bees.pathfinding(bee)
-  -- get the cell coordinate of the player
-  local goal=pos_to_cell(player.x+player.wr,player.y+player.hr)
-  local goal_index=cell_to_index(goal)
-
-
-	-- set frontier to start with bee's current map position
-	local start=pos_to_cell(bee.x,bee.y)
-	local start_index=cell_to_index(start)
-
-	local frontier={{cell=start, cost=0}}
-	local came_from={}
-	came_from[start_index]={cell=start,cost=0}
-
-	local current,neighbors
-	local count=0
-
-	bee.visited={}
-
-	local found=false
-
-	while #frontier>0 and not found do
-		--printh("frontier length: "..#frontier)
-		count+=1
-		--current=choose_next(frontier)
-		current=bees:choose_next(frontier,goal)
-		add(bee.visited,current.cell)
-		--printh("searching at: "..current[1]..","..current[2])
-		--mset(current[1],current[2],34)
-		neighbors=bees.get_neighbors(current.cell,came_from)
-
-		for neighbor in all(neighbors) do
-			local neighbor_index=cell_to_index(neighbor)
-			insert(frontier,{cell=neighbor, cost=current.cost+1})
-			came_from[neighbor_index]=current
-			if neighbor_index==goal_index then
-				--printh("found player in: "..count)
-				found=true
-				break
-			end
+		if bee.next_cell then
+			rectfill(
+				bee.next_cell[1]*8,bee.next_cell[2]*8,
+				bee.next_cell[1]*8+7,bee.next_cell[2]*8+7,
+				7)
 		end
-	end
 
-	current=came_from[goal_index]
-	if not current then
-		return
-	end
-	current = current.cell
-	bee.path={current}
-	local path_index=cell_to_index(current)
-
-	while path_index != start_index do
-		insert(bee.path, current)
-		current = came_from[path_index].cell
-		path_index = cell_to_index(current)
-	end
-	add(bee.path,goal)
-end
-
-function bees.get_neighbors(pos,came_from)
-  local neighbors={}
-  local lvl=levels.current
-	local x,y=pos[1],pos[2]
-
-	for i=-1,1 do
-		for j=-1,1 do
-			local newx,newy=x+i,y+j
-			local neighbor_index=cell_to_index({newx,newy})
-			if not came_from[neighbor_index] and
-				not (i==0 and j==0) and
-				newx>lvl.cx1 and newx<lvl.cx2 and
-				newy>lvl.cy1 and newy<lvl.cy2 and
-				not is_wall(mget(newx,newy))
-			then
-				add(neighbors,{newx,newy})
-			end
+		local points={}
+		for cell in all(bee.path) do
+			add(points,{cell[1]*8+4,cell[2]*8+4})
 		end
-	end
 
-  return neighbors
+		for i=2,#points do
+			local x1=points[i-1][1]
+			local y1=points[i-1][2]
+			local x2=points[i][1]
+			local y2=points[i][2]
+			line(x1,y1,x2,y2,8)
+		end
 end
 
 function bees:add(x,y)
-  local bee={
-		bee=true,
-    x=x,
-    y=y,
-    vx=0.5,
-    vy=0.5,
-    wr=3,
-    hr=3,
-    frame=1,
-    flipx=false,
-    die=bees.die,
-		path={},
+	local bee = entity_class:new({
+		is_bee=true,
+		x=x,y=y,
+		max_vx=1,
+		max_vy=1,
+		vx_turning=0.05,
+		vy_turning=0.1,
+		w=7,h=7,wr=3,hr=3,
+		collide_callback=bees.collide_callback,
+		flipx=false,
+		has_gravity=false,
+		die=bees.die,
 		update_counter=0,
-		pathfinding=bees.pathfinding,
-		move=bees.move,
-		animate=bees.animate
-  }
+		path={},
+		jitter=bees.jitter,
+		spr_x=64,spr_y=8,
+		anim={timer=0,frames=3,speed=1/4}
+	})
+	bee.pathfinder=pathfinder_class:new(bee)
   add(self.list, bee)
 end
 
 function bees.die(bee)
   --del(bees.list, bee)
 end
-
-
 
 --tutorials---------------------
 --------------------------------
@@ -1897,6 +1734,128 @@ function outro:draw()
 	print("press z to restart", 32, 70, 7)
 end
 
+-- pathfinder class
+pathfinder_class={}
+
+function pathfinder_class:new(agent)
+	return setmetatable({agent=agent}, {__index=pathfinder_class})
+end
+
+function pathfinder_class:update(target_entity)
+  -- get the cell coordinate of the target
+  self.goal_cell=pos_to_cell(target_entity.x+target_entity.wr,target_entity.y+target_entity.hr)
+  self.goal_index=cell_to_index(self.goal_cell)
+
+	-- set frontier to start with bee's current map position
+	local start_cell=pos_to_cell(self.agent.x,self.agent.y)
+	local start_index=cell_to_index(start_cell)
+
+	self.frontier={{cell=start_cell,index=start_index}}
+	self.came_from={}
+	self.came_from[start_index]=start_cell
+	self.cost_so_far={}
+	self.cost_so_far[start_index]=0
+
+	self.agent.visited={}
+
+	local path_cell = self:search_frontier()
+
+	self.agent.path={path_cell,self.goal_cell}
+	local path_index=cell_to_index(path_cell)
+
+	while path_index != start_index do
+		insert(self.agent.path, path_cell)
+		path_cell = self.came_from[path_index].cell
+		path_index = self.came_from[path_index].index
+	end
+end
+
+function pathfinder_class:search_frontier()
+	while #self.frontier>0 do
+		local current=pop_end(self.frontier)
+		if current.index==self.goal_index then
+			return current.cell
+		end
+
+		local neighbor_cells=self.get_neighbor_cells(current.cell)
+		for neighbor_cell in all(neighbor_cells) do
+			local neighbor_index=cell_to_index(neighbor_cell)
+			local new_cost=self.cost_so_far[current.index]+1
+
+			if (not self.cost_so_far[neighbor_index]) or (new_cost < self.cost_so_far[neighbor_index]) then
+				add(self.agent.visited,{neighbor_cell,new_cost})
+				self.cost_so_far[neighbor_index]=new_cost
+				if toggles.a_star then
+					insert_sorted(self.frontier, {
+							cell=neighbor_cell,
+							index=neighbor_index,
+							priority=new_cost+manhattan_heuristic(neighbor_cell,self.goal_cell)
+					})
+				else
+					insert(self.frontier,{cell=neighbor_cell,index=neighbor_index})
+				end
+				self.came_from[neighbor_index]=current
+			end
+		end
+	end -- while #frontier>0
+end
+
+
+function pathfinder_class.get_neighbor_cells(cell)
+  local neighbors={}
+  local lvl=levels.current
+	local x,y=cell[1],cell[2]
+
+	local neighbor_cells={
+		{x-1,y-1},
+		{x,y-1},
+		{x+1,y-1},
+		{x-1,y},
+		{x+1,y},
+		{x-1,y+1},
+		{x,y+1},
+		{x+1,y+1}
+	}
+
+	for _,check in pairs(neighbor_cells) do
+		if check[1]>lvl.cx1 and check[1]<lvl.cx2 and
+			check[2]>lvl.cy1 and check[2]<lvl.cy2 and
+			not is_wall(mget(check[1],check[2])) and
+			not is_spike(mget(check[1],check[2]))
+		then
+			add(neighbors,check)
+		end
+	end
+
+  return neighbors
+end
+
+function pathfinder_class:aim(agent)
+	local next_cell = agent.path[1]
+	if(not next_cell) return
+
+	if(agent.cx == next_cell[1] and agent.cy == next_cell[2]) do
+		del(agent.path,next_cell)
+		next_cell = agent.path[1]
+		if(not next_cell) return
+	end
+	agent.next_cell=next_cell
+
+	local targetx = next_cell[1]*8+4
+	local targety = next_cell[2]*8+4
+
+	if(targetx<agent.x) agent.vx=max(agent.vx-agent.vx_turning,-agent.max_vx)
+	if(targetx>agent.x) agent.vx=min(agent.vx+agent.vx_turning,agent.max_vx)
+	if(targetx==flr(agent.x)) agent.vx=0
+	agent.flipx=agent.vx<0
+
+
+	if(targety<agent.y) agent.vy=max(agent.vy-agent.vy_turning,-agent.max_vy)
+	if(targety>agent.y) agent.vy=min(agent.vy+agent.vy_turning,agent.max_vy)
+	if(targety==flr(agent.y)) agent.vy=0
+end
+
+
 -- utility functions
 --------------------------------
 function truncate(tbl)
@@ -1905,6 +1864,9 @@ function truncate(tbl)
 	end
 end
 
+function manhattan_heuristic(start, target)
+	return abs(start[1]-target[1]) + abs(start[2]-target[2])
+end
 -- converts x/y coordinate to map cell coords
 function pos_to_cell(x,y)
   return {
@@ -1941,6 +1903,27 @@ function insert(tbl,val)
   tbl[1]=val
 end
 
+-- insert a value into a priority sorted table
+-- assumes the new entry and all prioer entries
+-- has a "priority" key
+function insert_sorted(tbl,new_entry)
+	if #tbl==0 then
+		add(tbl,new_entry)
+		return
+	end
+
+	add(tbl,{})
+	for i=#tbl,2,-1 do
+		local next=tbl[i-1]
+		if new_entry.priority < next.priority then
+			tbl[i]=new_entry
+			return
+		else
+			tbl[i]=next
+		end
+	end
+	tbl[1]=new_entry
+end
 -- animation functions
 
 -- wrapper for resuming w/ error
@@ -2020,9 +2003,9 @@ end
 make_toggle("performance",1)
 make_toggle("path_vis",2)
 make_toggle("a_star",3)
-make_toggle("bee_move",4)
+make_toggle("bee_move",3)
 
-menuitem(5,"spawn bee", function()
+menuitem(4,"spawn bee", function()
 	bees:add(levels.current.x2-8,levels.current.y2-8)
 end)
 
@@ -2041,12 +2024,12 @@ __gfx__
 00000000565dd5d5000565d500000000565d50005d5dd5650000000000000000000555555555500035dd5d550000000000000000000000000000000000000000
 00000000555555550005555500000000555550005555555500000000000000000005555555555000555555550000000000000000000000000000000000000000
 0c0c000c000c000000b000000000000000b000b00000000000000000000000000770004000000000000000000000000000000000000000000000000000000000
-0b00b00b00b0000004004b040040040b400400400000000000000000000000007667040000000440000004400000000000000000000000000000000000000000
-070700070007000000000000b0b0b0000000000000000000000000000000000007667a0007777a0000a66a000000000000000000000000000000000000000000
-030030030030000000000000000000000000000000000000000000000000000005a5a8a06666a8a0056678a00000000000000000000000000000000000000000
-0808000800080000000000000000000000000000000000000000000000000000a5a5aaa0a5a5aaa0a777aaa00000000000000000000000000000000000000000
-0b00b00b00b0000000000000000000000000000000000000000000000000000005a5aa0005a5aa0005a5aa000000000000000000000000000000000000000000
-0a0a000a000a00000000000000000000000000000000000000000000000000004040400004040400040404000000000000000000000000000000000000000000
+0b00b00b00b0000004004b040040040b400400400000000000000000000000007667040000004400000440000000000000000000000000000000000000000000
+070700070007000000000000b0b0b0000000000000000000000000000000000007667a007777a000a66a00000000000000000000000000000000000000000000
+030030030030000000000000000000000000000000000000000000000000000005a5a8a6666a8a056678a0000000000000000000000000000000000000000000
+0808000800080000000000000000000000000000000000000000000000000000a5a5aaaa5a5aaaa777aaa0000000000000000000000000000000000000000000
+0b00b00b00b0000000000000000000000000000000000000000000000000000005a5aa005a5aa005a5aa00000000000000000000000000000000000000000000
+0a0a000a000a00000000000000000000000000000000000000000000000000004040400040404004040400000000000000000000000000000000000000000000
 03003003003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 dddddddd33b3333b000000000044440000444400004444000044440000444400004444000000000000000000000000000c0c000c000000000000000000000000
 dddddddd33333b3388888888045c5c4004ccaa4004ccaa4004ccaa4004ccaa4004ccaa400000000000000000000000000b00b0b0000000000000000000000000
@@ -2056,13 +2039,13 @@ dddddddd5d3535d3888888884c5c5c5447cc66644c666cc4466ccc744ccc77c44c77cc6400000000
 dddddddd55355555888888884c5c5c54477cccc44cccccc44cccc7744cc7777447777cc40000000000000000000000000b00b0b0000000000000000000000000
 dddddddd563dd5d5888888884c5c5c5446ccccc44cccccc44ccccc644ccc66c44c66ccc40000000000000000000000000a0a000a000000000000000000000000
 dddddddd55555555888888884c5c5c544cccccc44cccccc44cccccc44cccccc44cccccc400000000000000000000000003003030000000000000000000000000
-007000000000000000000000000000000001000001110000000000100000000007700000000000000000000000000000000000000c00700800a0000000000000
-077000700000000000000000000000000001100001011000000001100000000076670000000000000000000000000000000000000b00300b0030000000000000
-07770070000000000000000000000000000010000110100000001100111000000766000000000000000000000000000000000000c00700800a00000000000000
-577756770000000000000000000000000000110000001110001111100011000005a50000000000000000000000000000000000000b00300b0030000000000000
-5677567600000000000000000000000000011110000111000010110001110000a5a500000000000000000000000000000000000000c00700800a000000000000
-567656660000000000000000000000001111101000011000000011100101100005a50000000000000000000000000000000000000b00300b0030000000000000
-56665555000000000000000000000000001100000011110000001100001111004040000000000000000000000000000000000000000000000000000000000000
+007000000000000000000000000000000001000001110000000000100000000000000000000000000000000000000000000000000c00700800a0000000000000
+077000700000000000000000000000000001100001011000000001100000000000000000000000000000000000000000000000000b00300b0030000000000000
+07770070000000000000000000000000000010000110100000001100111000000000000000000000000000000000000000000000c00700800a00000000000000
+577756770000000000000000000000000000110000001110001111100011000000000000000000000000000000000000000000000b00300b0030000000000000
+5677567600000000000000000000000000011110000111000010110001110000000000000000000000000000000000000000000000c00700800a000000000000
+567656660000000000000000000000001111101000011000000011100101100000000000000000000000000000000000000000000b00300b0030000000000000
+56665555000000000000000000000000001100000011110000001100001111000000000000000000000000000000000000000000000000000000000000000000
 55555555000000000000000000000000011111100111111000011110011111100000000000000000000000000000000000000000000000000000000000000000
 00e0000000e0000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000e00000005550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
