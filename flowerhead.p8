@@ -1236,29 +1236,24 @@ end
 grasses={
   map={},
   tiles={},
-  t=0,
-  anim=0,
-  sp=16
+  anim={timer=0,frames=4,speed=1/15}
 }
 
-function grasses.update(g)
-	if (g.t>60) g.t=0
-	g.t+=1
-	if g.t<15 then
-		g.anim=1
-	elseif g.t<30 then
-		g.anim=0
-	elseif g.t<45 then
-		g.anim=2
-	else
-		g.anim=0
-	end
-end
 
-function grasses.draw(g)
-	for grass_row,grasses in pairs(g.map) do
-		for grass_col,spx in pairs(grasses) do
-			sspr(3*spx,8+2*g.anim,3,2,grass_col-1,grass_row)
+function grasses:draw()
+	self.anim.timer+=self.anim.speed
+	if(self.anim.timer>=self.anim.frames) self.anim.timer=0
+
+	local spr_x,spr_y
+	for grass_row,grasses in pairs(self.map) do
+		for grass_col,grass_value in pairs(grasses) do
+			spr_x=3 * flr(self.anim.timer)
+			spr_y=8 + 2*grass_value
+			sspr(
+				spr_x,spr_y,
+				3,2,
+				grass_col-1,grass_row
+			)
 		end
 	end
 end
@@ -1266,24 +1261,22 @@ end
 function grasses.plant(x,y)
 	local x,cx=flr(x),flr(x/8)
 	local y,cy=flr(y),flr(y/8)
-	-- start a new grass map row
-	-- if necessary
+
+	-- start a new grass map row if necessary
 	grasses.map[y]=grasses.map[y] or {}
 
 	-- return if grass already at x
-	if(grasses.map[y][x]) return false
+	if(grasses.map[y][x]) return
 
-	local tile1,tile2
-	tile1=mget(cx,cy)
-	tile2=mget(cx,cy+1)
+	local tile1,tile2=mget(cx,cy),mget(cx,cy+1)
+
+	if(not is_plantable(tile1,tile2)) return
 
 	-- insert one of four possible
 	-- flower types
-	if is_plantable(tile1,tile2) then
-		levels.current.planted+=1
-		grasses.map[y][x]=flr(rnd(4))
-    grasses.updatetile(cx,cy+1)
-	end
+	levels.current.planted+=1
+	grasses.map[y][x]=flr(rnd(4))
+	grasses.updatetile(cx,cy+1)
 end
 
 function grasses.updatetile(cx,cy)
