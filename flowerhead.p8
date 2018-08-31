@@ -452,16 +452,19 @@ function game_mode.lvl_complete:start()
 	self.box2={x=cam.x-64,y=cam.y+64,w=127,h=127,color=1}
 	defer_animation(self.box1,{x=cam.x-64,y=player.y-15-127,duration=30})
 	defer_animation(self.box2,{x=cam.x-64,y=player.y+15,duration=30})
+  add(coroutines,coroutine_sequence({
+      make_delay(120),
+      function()
+        music(0)
+        truncate(deferred_draws)
+        levels:goto_next()
+      end
+  }))
 	music(10)
 end
 
 function game_mode.lvl_complete:update()
 	levels:update()
-	if btnp(4) then
-		music(0)
-    truncate(deferred_draws)
-		levels:goto_next()
-	end
 end
 
 function game_mode.lvl_complete:draw()
@@ -560,60 +563,62 @@ function player:init()
   self.is_player=1
 
 	-- velocity
-	player.vx=0
-	player.vy=0
+	self.vx=0
+	self.vy=0
 
 	--lists of our previous
 	--positions/flippage for
 	--effects rendering
-	player.prevx=0
-	player.prevy=0
-	player.prevf=0
+	self.prevx=0
+	self.prevy=0
+	self.prevf=0
 
 	--the "effects" timer
-	player.etimer=0
+	self.etimer=0
 
 	--the sprite is 3x5, so the
 	--wr and hr dimensions are
 	--radii, and x/y is the
 	--initial center position
 
-	player.wr=1
-	player.hr=2
-	player.w=3
-	player.h=5
+	self.wr=1
+	self.hr=2
+	self.w=3
+	self.h=5
 
-	player.hit_jump=false
+	self.hit_jump=false
 
 	--instantaneous jump velocity
 	--the "power" of the jump
-	player.jumpv=3
+	self.jumpv=3
 
 	--movement states
-	player.standing=false
-	player.wallsliding=false
+	self.standing=false
+	self.wallsliding=false
+
+  self.disable_input=false
 
 	--what direction we're facing
 	--1 or -1, used when we're
 	--facing away from a wall
 	--while sliding
-	player.facing=1
+	self.facing=1
 
 	--timers used for animation
 	--states and particle fx
-	player.falltimer=7
-	player.landtimer=0
-	player.runtimer=0
-	player.headanimtimer=0
-	player.throwtimer=0
+	self.falltimer=7
+	self.landtimer=0
+	self.runtimer=0
+	self.headanimtimer=0
+	self.throwtimer=0
 
-	player.dead=false
-	player.dying=false
-	player.dying_timer=0
+	self.dead=false
+	self.dying=false
+	self.dying_timer=0
 
-  player.exit_timer=0
+  self.exit_timer=0
 
-	player.spr=64
+	self.spr=64
 
 	--sprite numbers------
 	--64 standing
@@ -627,12 +632,12 @@ function player:init()
 	--98 sliding 3 / hanging
 	--99 sliding 4
 
-	player.x=levels.current.spawnx
-	player.y=levels.current.spawny
+	self.x=levels.current.spawnx
+	self.y=levels.current.spawny
   if debug then
     printh("--player init--")
-    printh("player.x: "..player.x)
-    printh("player.y: "..player.y)
+    printh("player.x: "..self.x)
+    printh("player.y: "..self.y)
     printh("cam.x: "..cam.x)
     printh("cam.y: "..cam.y)
   end
@@ -711,9 +716,8 @@ function player:update()
     return
   end
 	self.standing=self.falltimer<7
-	self.moving=nil
 	--move the player, x then y
-	self:handleinput()
+	if(not self.disable_input) self:handleinput()
 	self:movex()
 	self:movey()
 	self:movejump()
