@@ -78,29 +78,18 @@ end
 function game_mode.game:draw()
   cls()
 
-	clouds:draw()
-	cam:draw()
-	levels:draw()
-	tutorials:draw()
-	grasses:draw()
-	bees:draw()
-	player:draw()
-	specks:draw()
-	bombs:draw()
-	explosions:draw()
-	banners:draw()
-
-
-  --print(round(percent,2).."%",cam.x-60,cam.y-64,11)
-
-  if cam.fadeout>0 then
-    for i=0,15 do
-      pal(i,i*(1-cam.fadeout),1)
-    end
-  else
-    pal()
-  end
-  if cam.fadeout>0 then cam.fadeout-=.1 end
+  clouds:draw()
+  cam:draw()
+  levels:draw()
+  tutorials:draw()
+  grasses:draw()
+  bees:draw()
+  player:draw()
+  specks:draw()
+  bombs:draw()
+  explosions:draw()
+  banners:draw()
+  cam:fade()
 end
 
 function round(num, numdecimalplaces)
@@ -1309,7 +1298,7 @@ function bomb_class:dud()
   del(bombs.list,self)
 end
 
-laffs={"woo","haa","hoo","hee","hii","yay"}
+laffs={"woo","haa","hoo","hee","hii","yaa"}
 function bomb_class:explode()
 	explosions.add(self.x,self.y,4)
   local prev_planted=levels.current.planted
@@ -1564,6 +1553,17 @@ end
 
 function cam:draw()
 	camera(cam:position())
+end
+
+function cam:fade()
+  if self.fadeout>0 then
+    for i=0,15 do
+      pal(i,i*(1-self.fadeout),1)
+    end
+    self.fadeout-=.1
+  else
+    pal()
+  end
 end
 
 --the bees----------------------
