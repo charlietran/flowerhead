@@ -111,7 +111,10 @@ function round(num, numdecimalplaces)
   return flr(num + 0.5)
 end
 
-clouds={}
+clouds={
+  speed=0.1,
+  padding=40,
+}
 clouds.list={}
 
 function reset_level()
@@ -162,14 +165,13 @@ function clouds:draw()
 	-- x direction. multiplied by
 	-- 10 to get the right cloud
 	-- drifting speed
-	local t=time()*25
 
 	-- draw the clouds as circles
 	-- drifting in the x direction
 	-- over time and with parallax
-	local cloudalt=true
+  local t=time()
 	for _,cloud in pairs(self.list) do
-			local cloudx, cloudy
+			local cloudx,cloudy
 			-- the y offset is the
 			-- product of our current cam
 			-- offset and the cloud size
@@ -184,13 +186,12 @@ function clouds:draw()
 			-- with our time factor added
 			-- so that the clouds appear
 			-- to drift to the left
-			cloudx=cloud.x-((cam.x+t)*cloud.size*.01+.3)%192+32
 
-      --5
+      local xdrift  = 0.1*cam.x+t
+      local xoffset = cloud.x-xdrift*cloud.size*clouds.speed
+      local xrange  = 128+clouds.padding+2*cloud.size
 
-      --64
-      --64-5
-      --127+5
+      cloudx=xoffset%xrange-cloud.size
 
       fillp(0b0110111110111111)
 
