@@ -771,7 +771,6 @@ function player:handleinput()
 
   -- press lshift or tab for debug menu
   if btnp(4,1) then
-    game_mode.debug_menu:init()
     current_game_mode=game_mode.debug_menu
   end
 
@@ -1255,8 +1254,7 @@ grasses={
 
 
 function grasses:draw()
-	self.anim.timer+=self.anim.speed
-	if(self.anim.timer>=self.anim.frames) self.anim.timer=0
+	self.anim.timer=(self.anim.timer+self.anim.speed)%self.anim.frames
 
 	local spr_x,spr_y
 	for grass_row,grasses in pairs(self.map) do
@@ -1264,9 +1262,9 @@ function grasses:draw()
 			spr_x=3 * flr(self.anim.timer)
 			spr_y=8 + 2*grass_value
 			sspr(
-				spr_x,spr_y,
-				3,2,
-				grass_col-1,grass_row
+				spr_x,spr_y,  -- sprite coords
+				3,2,          -- width, height
+				grass_col-1,grass_row -- screen coords
 			)
 		end
 	end
@@ -2097,21 +2095,49 @@ end
 game_mode.debug_menu.sel=1
 game_mode.debug_menu.items={}
 
+toggles={
+  performace=false,
+  path_vis=false,
+	a_star=true,
+	bee_move=true,
+}
+
 function game_mode.debug_menu:update()
   if btnp(2) then self.sel-=1 end
   if btnp(3) then self.sel+=1 end
   self.sel=mid(self.sel,1,#self.items)
   if btnp(4) then self.items[self.sel][2]() end
   if btnp(4,1) then current_game_mode=game_mode.game end
+
+  self.items={}
+  self:make_toggle("performance")
+  self:make_toggle("path_vis")
+  self:make_toggle("a_star")
+  add(self.items,{
+    "spawn bee ("..#bees.list..")", function()
+      bees:add(levels.current.sx1+12,levels.current.sy1+12)
+    end
+  })
+  self:make_toggle("bee_move")
+  add(self.items,{
+    "skip to next level", function() levels:goto_next() end
+  })
+  add(self.items,{
+    "open current door", function() levels:open_door() end
+  })
+  add(self.items,{
+    "return to game", function() current_game_mode=game_mode.game end
+  })
 end
 
 function game_mode.debug_menu:draw()
   cls()
   camera(0,0)
-  print("-- debug --",10,2,15)
+  print("--- debugging ---",10,2,15)
+  print("press tab to exit",10,10,15)
   cursor(10,10)
   for index,item in pairs(self.items) do
-    local y_off=10+(index-1)*8
+    local y_off=24+(index-1)*8
     if index==self.sel then
       rectfill(8,y_off-1,10+#item[1]*4+5,y_off+5,15)
       print(item[1],13,y_off,0)
@@ -2121,41 +2147,12 @@ function game_mode.debug_menu:draw()
   end
 end
 
-function game_mode.debug_menu:init()
-  self:make_toggle("performance",1)
-  self:make_toggle("path_vis",2)
-  self:make_toggle("a_star",3)
-  self.items[4] = {
-    "spawn bee", function()
-      bees:add(levels.current.sx1+12,levels.current.sy1+12)
-    end
-  }
-  self:make_toggle("bee_move",5)
-  self.items[6]={
-    "skip to next level", function() levels:goto_next() end
-  }
-  self.items[7]={
-    "open current door", function() levels:open_door() end
-  }
-  self.items[8]={
-    "return to game", function() current_game_mode=game_mode.game end
-  }
-end
-
-function game_mode.debug_menu:make_toggle(name,index)
-	self.items[index]={
+function game_mode.debug_menu:make_toggle(name)
+	add(self.items,{
     name..": "..(toggles[name] and "enabled" or "disabled"),
-    function()
-      toggles[name] = not toggles[name]
-      self:make_toggle(name,index)
-    end
-  }
+    function() toggles[name] = not toggles[name] end
+  })
 end
-
-toggles={
-	bee_move=true,
-	a_star=true
-}
 
 __gfx__
 00000000555555550005555555555555555550000000000055555000000555550000000000000000333333335555555533333333000000000000000000000000
