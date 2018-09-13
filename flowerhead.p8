@@ -450,13 +450,16 @@ function banners:draw()
 end
 
 function game_mode.lvl_complete:start()
+  -- change game mode and exit the level
 	current_game_mode=game_mode.lvl_complete
 	levels.current.exited=true
 	player.vx=0
+	music(10)
+
 	self.box1={x=cam.x-64,y=cam.y-64-127,w=127,h=127,color=1}
 	self.box2={x=cam.x-64,y=cam.y+64,w=127,h=127,color=1}
-	defer_animation(self.box1,{x=cam.x-64,y=player.y-15-127,duration=30})
-	defer_animation(self.box2,{x=cam.x-64,y=player.y+15,duration=30})
+	deferred_animate(self.box1,{x=cam.x-64,y=player.y-15-127,duration=30})
+	deferred_animate(self.box2,{x=cam.x-64,y=player.y+15,duration=30})
   add(coroutines,coroutine_sequence({
       make_delay(120),
       function()
@@ -465,7 +468,6 @@ function game_mode.lvl_complete:start()
         levels:goto_next()
       end
   }))
-	music(10)
 end
 
 function game_mode.lvl_complete:update()
@@ -715,13 +717,16 @@ function player:update()
 		return false
   end
 
+  -- only exit once we've touched the door for 15 frames
   if self.exit_timer >= 15 then
     game_mode.lvl_complete:start()
     return
   end
+
 	self.standing=self.falltimer<7
-	--move the player, x then y
+
 	if(not self.disable_input) self:handleinput()
+	--move the player, x then y
 	self:movex()
 	self:movey()
 	self:movejump()
@@ -1357,7 +1362,7 @@ function bomb_class:explode()
 	end
   if levels.current.planted-prev_planted>4 then
     local laff={x=self.x,y=self.y,t=laffs[ceil(rnd(6))]}
-    defer_animation(laff,{
+    deferred_animate(laff,{
         x=self.x,y=self.y-10,duration=60,
         draw=function() print(laff.t,laff.x+cos(t()),laff.y,3) end
     })
@@ -2011,8 +2016,9 @@ function cowrap(cor,...)
   assert(ok, err)
 end
 
-function defer_animation(obj,params)
-  add(coroutines,
+function deferred_animate(obj,params)
+  add(
+    coroutines,
     cocreate(make_animation(obj,params))
   )
 end
