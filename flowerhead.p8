@@ -344,40 +344,47 @@ function levels:open_door()
     mset(self.current.door_cx,self.current.door_cy,36)
     add(deferred_draws,self:make_door_anim())
 end
+
+function levels:make_door_anim(x,y)
+  local door_cx,door_cy=self.current.door_cx,self.current.door_cy
+  local x,y=door_cx*8+5,door_cy*8+2
   local frame=0
 
   return function()
 		frame=(frame+1/16)%5
-		mset(doorx,doory,36+frame)
+		mset(door_cx,door_cy,36+frame)
 
     local t=time()
-    --local radius=sqrt((player.x-x)^2+(player.y-y)^2)-16+8*cos(t/4)
-    --local factor=.4
-    --local center_x=x+factor*(player.x-x)
-    --local center_y=y+factor*(player.y-y)
-    --local radius=0.6*sqrt((player.x-center_x)^2+(player.y-center_y)^2)*(1-(.2*cos(t/4)))
-
-
     local rays=16
     local dx,dy=player.x-x,player.y-y
-    local radius=sqrt((dx/1000)^2+(dy/1000)^2)*1000
 
-    angle=0.5+atan2(dx,dy)
+    -- distance to the player (pythagorean)
+    -- divided then re-multiplied by 1000
+    -- to avoid integer overflow
+    local distance=sqrt((dx/1000)^2+(dy/1000)^2)*1000
 
-    local ease_angle=function(t) return -t^2+t+1 end
-    --local ease_angle=function(t) return 3-(2^(-t/2+3/2)) end
+    -- get the angle to the player
+    local angle=0.5+atan2(dx,dy)
 
     for i=1,rays do
+      -- tmod is a time offset so that each ray
+      -- starts at at different angle
       local tmod=t/rays+i/rays
-      local rmod=(0.35-0.35*ease_angle(cos(tmod-angle)))*(1-.2*cos(t/4))
+
+      -- subtract our angle from tmod so that it points
+      -- towards the player
+      local dmod_angle = tmod-angle
+
+      -- modify distance so that it shrinks while
+      -- pointing away from the player
+      local dmod=-0.7*cos(dmod_angle)*(1-.2*cos(t/4))
 
       line(
         x,y,
-        x+rmod*radius*cos(tmod),
-        y+rmod*radius*sin(tmod),
+        x+dmod*distance*cos(tmod),
+        y+dmod*distance*sin(tmod),
         10)
     end
-
   end
 end
 
@@ -2071,6 +2078,15 @@ end
 function ease_in_quad(t)
   return t*t
 end
+
+function ease_out_quad_alt(t)
+  return -t^2+t+1
+end
+
+function ease_angle(t,easing)
+  return easing((t+1)/2)
+end
+
 
 function linear(t)
   return t
