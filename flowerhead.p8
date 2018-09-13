@@ -243,8 +243,8 @@ function levels.setup(lvl)
   -- from the top-left block
   -- x/y = pixel coords
   -- cx/cy = map cell coords
-  lvl.x1=cx1*8
-  lvl.y1=cy1*8
+  lvl.sx1=cx1*8
+  lvl.sy1=cy1*8
 
   lvl.plantable=0
   lvl.planted=0
@@ -256,7 +256,7 @@ function levels.setup(lvl)
   for cx2=cx1,127 do
     if mget(cx2,cy1)==9 then
       lvl.cx2=cx2
-      lvl.x2=cx2*8+8
+      lvl.sx2=cx2*8+8
       break
     end
   end
@@ -264,27 +264,27 @@ function levels.setup(lvl)
   for cy2=cy1,63 do
     if mget(cx1,cy2)==7 then
       lvl.cy2=cy2
-      lvl.y2=cy2*8+8
+      lvl.sy2=cy2*8+8
       break
     end
   end
 
-  for y=cy1,lvl.cy2 do
-    for x=cx1,lvl.cx2 do
-      local t=mget(x,y)
-      local at=mget(x,y-1)
-      -- if a static block or floor block, add to plantable
-      if t==1 or t==3 then
-        if not is_wall(at) and at~=35 and at~=36 and not is_spike(at) then
-          lvl.plantable+=8
-        end
+  for cy=cy1,lvl.cy2 do
+    for cx=cx1,lvl.cx2 do
+      -- check for plantable tiles and set the level's plantable count
+
+      if is_plantable(cx,cy) then
+        lvl.plantable+=1
       end
 
-      -- if door, set door location
-      if t==35 or t==36 then
-        lvl.doorx=x
-        lvl.doory=y
-        lvl.dooropen=t==36
+      -- if door found, set level's door location
+      local tile=mget(cx,cy)
+      if tile==35 or tile==36 then
+        lvl.door_cx=cx
+        lvl.door_cy=cy
+        lvl.door_sx=cx*8
+        lvl.door_sy=cy*8
+        lvl.dooropen=tile==36
       end
     end
   end
@@ -296,8 +296,8 @@ end
 function levels.set_spawn(lvl)
 	-- find start sprite (#64) and
 	-- set initial x/y position
-	for i=lvl.x1/8,lvl.x2/8 do
-		for j=lvl.y1/8,lvl.y2/8 do
+	for i=lvl.cx1,lvl.cx2 do
+		for j=lvl.cy1,lvl.cy2 do
 			if mget(i,j)==64 then
 				lvl.spawnx=i*8+3
 				lvl.spawny=j*8
@@ -305,44 +305,35 @@ function levels.set_spawn(lvl)
 				break
 			end
 		end
-		if player.x then break end
+		if lvl.spawnx then break end
 	end
 end
 
 function levels:update()
 	local c=self.current
 
-  c.percent_complete=round((levels.current.planted / levels.current.plantable)*100,2)
-
-	if not c.dooropen and not c.exited and c.planted/c.plantable>=1 then
-    c.dooropen=true
-    sfx(0)
-    mset(c.doorx,c.doory,36)
-    add(deferred_draws,self:make_draw_open_door())
-	end
+  if not c.dooropen and not c.exited and c.planted>=c.plantable then
+    self:open_door()
+  end
 end
 
 function levels:draw()
-  local x,y=self.current.doorx*8,self.current.doory*8
+  local c=self.current
 
-  if self.current.exited then
-    map(
-      levels.current.doorx,levels.current.doory,
-      x,y,
-      1,1)
+  -- if exited, only draw the door at its screen location
+  if c.exited then
+    map(c.door_cx,c.door_cy,c.door_sx,c.door_sy,1,1)
   else
-    map(
-      self.current.cx1,self.current.cy1,
-      self.current.x1,self.current.y1,
-      self.current.cx2-self.current.cx1+1,
-      self.current.cy2-self.current.cy1+1)
+  -- otherwise, draw the whole current level
+    map(c.cx1,c.cy1, -- cell coords of level origin
+        c.sx1,c.sy1, -- screen coords of level origin
+        c.cx2-c.cx1+1,
+        c.cy2-c.cy1+1)
   end
 
-  if not self.current.dooropen then
-    print(
-      ceil((self.current.plantable-self.current.planted)/8),
-      x+1,y-6, 7
-    )
+  -- draw plant remainder above a locked exit
+  if not c.dooropen then
+    print(c.plantable-c.planted,c.door_sx+1,c.door_sy-6,7)
   end
 end
 
@@ -1123,11 +1114,15 @@ function collide(e,a,d,nearonly)
 		y2+=d
 	end
 
+  local coll={axis=a}
+
 	-- query our 2 points to see
 	-- what tile types they're in
-	local tile1=mget(x1/8,y1/8)
-	local tile2=mget(x2/8,y2/8)
+  local cx1,cy1,cx2,cy2=flr(x1/8),flr(y1/8),flr(x2/8),flr(y2/8)
+	local tile1=mget(cx1,cy1)
+	local tile2=mget(cx2,cy2)
 
+  -- start the exit timer when player touches door
   if not levels.current.exited and e.is_player and (is_open_exit(tile1) or is_open_exit(tile2)) then
     e.exit_timer+=1
   end
@@ -1140,38 +1135,55 @@ function collide(e,a,d,nearonly)
 	-- want to know if our near
 	-- corner will be in a wall
 	if nearonly and is_wall(tile1) and (tile1!=2 or y1%8<4) then
-		return {axis=a}
+    coll.tile,coll.cx,coll.cy=tile1,cx1,cy1
+	elseif not nearonly then
+    --if not nearonly, check if
+    --either corner will hit a wall
+    if is_wall(tile1) then
+      coll.tile,coll.cx,coll.cy=tile1,cx1,cy1
+    elseif is_wall(tile2) then
+      coll.tile,coll.cx,coll.cy=tile2,cx2,cy2
+    end
 	end
 
-	--if not nearonly, check if
-	--either corner will hit a wall
-	if not nearonly and (is_wall(tile1) or is_wall(tile2)) then
-		return {axis=a}
-	end
-
-	--now check if we will hit any
-	--moving platforms
-
-	-- no hits detected
-	return false
+  if coll.tile then
+    return coll
+  else
+    return false
+  end
 end
 
+-- sprite flags:
+-- 0: collidable wall
+-- 1: plantable
+-- 2: open exit
+-- 3: is exit (open or closed)
+
 function is_wall(tile)
- --we know our tile sprites
- --our stored in slots 1-10
- return tile>=1 and tile<=15
+  return fget(tile,0)
 end
 
 function is_spike(tile)
 	return tile==48
 end
 
-function is_closed_exit(tile)
-	return tile==35
+function is_exit(tile)
+  return fget(tile,3)
 end
 
 function is_open_exit(tile)
-  return tile>=36 and tile<=40
+  return fget(tile,2)
+end
+
+-- a tile is plantable if it has flag 1 set
+-- and the tile above it is not a wall, exit or spike
+function is_plantable(cx,cy)
+  local tile=mget(cx,cy)
+  local above_tile=mget(cx,cy-1)
+  return fget(tile,1) and
+          not is_wall(above_tile) and
+          not is_spike(above_tile) and
+          not is_exit(above_tile)
 end
 
 --effects-----------------------
@@ -1247,37 +1259,42 @@ function grasses.plant(x,y)
 	grasses.map[y]=grasses.map[y] or {}
 
 	-- return if grass already at x
-	if(grasses.map[y][x]) return
+	if grasses.map[y][x] then return end
+  -- return if the tile below is not plantable
+	if not is_plantable(cx,cy+1) then return end
 
-	local tile1,tile2=mget(cx,cy),mget(cx,cy+1)
-
-	if(not is_plantable(tile1,tile2)) return
-
-	-- insert one of four possible
-	-- flower types
-	levels.current.planted+=1
+	-- insert one of four possible flower types
 	grasses.map[y][x]=flr(rnd(4))
-	grasses.updatetile(cx,cy+1)
+	grasses.update_tile(cx,cy+1)
 end
 
-function grasses.updatetile(cx,cy)
+-- updates the count of grasses planted within a tile
+-- if the tile is fully planted, mark it as such and
+-- increase the current level's planted count
+function grasses.update_tile(cx,cy)
+  -- initialize the grass tile if necessary
   grasses.tiles[cy]=grasses.tiles[cy] or {}
   grasses.tiles[cy][cx]=grasses.tiles[cy][cx] or 0
+
+  -- return if this tile is already fully planted
+  if grasses.tiles[cy][cx]==8 then return end
+
   grasses.tiles[cy][cx]+=1
-  if grasses.tiles[cy][cx]==8 then
+
+  -- if a tile has at least 6 (out of 8) grasses planted,
+  -- mark it as fully planted
+  if grasses.tiles[cy][cx]>=6 then
+    grasses.tiles[cy][cx]=8
+    levels.current.planted+=1
+
+    -- draw the tile differently now that it is planted
+    -- the sprite sheet is arbitrarily set up so that
+    -- the planted version of a tile is 9 sprites
+    -- to the right
     ot=mget(cx,cy)
     mset(cx,cy,ot+9)
   end
 end
-
-function is_plantable(tile1,tile2)
-	return is_wall(tile2)
-          and not is_spike(tile1)
-          and not is_closed_exit(tile1)
-          and not is_open_exit(tile1)
-          and not is_wall(tile1)
-end
-
 
 --flower bombs------------------
 --------------------------------
@@ -1295,17 +1312,21 @@ function bomb_class:new(obj)
 end
 
 function bomb_class:collide_callback(collision)
-	-- when a bomb x-collides with wall, bounce back
-	if collision.axis=='x' then
-		self.vx=-self.vx/4
-	-- only explode when a bomb hits the floor
-	elseif collision.axis=='y' then
-		if self.vy>0 then
-			self:explode()
-		else
-			self.vy=0
-		end
-	end
+  -- when a bomb x-collides with wall, bounce back
+  if collision.axis=='x' then
+    self.vx=-self.vx/4
+    -- only explode when a bomb hits the floor
+  elseif collision.axis=='y' then
+    if self.vy>0 then
+      if not is_plantable(collision.cx,collision.cy) then
+        self:dud()
+      else
+        self:explode()
+      end
+    else
+      self.vy=0
+    end
+  end
 end
 
 function bomb_class:hit_spike()
@@ -1314,7 +1335,7 @@ end
 
 function bomb_class:dud()
 	explosions.add(self.x,self.y+2,2)
-  sfx(41,-1,1)
+  sfx(41,3,1)
   del(bombs.list,self)
 end
 
@@ -1332,8 +1353,8 @@ function bomb_class:explode()
         draw=function() print(laff.t,laff.x+cos(t()),laff.y,3) end
     })
   end
-	sfx(40)
-	sfx(41)
+	sfx(40,-1)
+	sfx(41,-1)
 	cam:shake(6,1)
 	del(bombs.list,self)
 end
@@ -1551,8 +1572,8 @@ function cam:update()
 	-- clamp the camera offset to
 	-- be within the bounds of our
 	-- current.level
-	self.x=mid(self.x,levels.current.x1+64,levels.current.x2-64)
-	self.y=mid(self.y,levels.current.y1+64,levels.current.y2-64)
+	self.x=mid(self.x,levels.current.sx1+64,levels.current.sx2-64)
+	self.y=mid(self.y,levels.current.sy1+64,levels.current.sy2-64)
 end
 
 -- returns coordinates to be
