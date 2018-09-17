@@ -763,12 +763,12 @@ end
 
 function player:handleinput()
 	if self.standing then
-		self:groundinput()
+		self:ground_input()
 	else
-		self:airinput()
+		self:air_input()
 	end
-	self:jumpinput()
-	self:bombinput()
+	self:jump_input()
+	self:bomb_input()
 
   -- press lshift or tab for debug menu
   if btnp(4,1) then
@@ -780,7 +780,7 @@ function player:handleinput()
 	self.vx*=0.98
 end
 
-function player.jumpinput(p)
+function player.jump_input(p)
 	local jump_pressed=btn(4)
 	if jump_pressed and not p.is_jumping then
 		p.hit_jump=true
@@ -788,86 +788,90 @@ function player.jumpinput(p)
 		p.hit_jump=false
 	end
 	p.is_jumping=jump_pressed
-end --player.jumpinput
+end --player.jump_input
 
-function player.bombinput(p)
+function player:bomb_input()
 	local bomb_pressed=btn(5)
-	if bomb_pressed and not p.is_bombing then
-		p.hit_bomb=true
-	else
-		p.hit_bomb=false
-	end
-	p.is_bombing=bomb_pressed
-	if p.hit_bomb then
-		p:throw_flowerbomb()
-		p.throwtimer=7
-	end
-end
 
-function player.movejump(p)
+  if self.is_bombing and not bomb_pressed then
+    self.is_bombing=false
+    self.bomb_input_timer=0
+	elseif not self.is_bombing and bomb_pressed then
+    self.bomb_input_timer+=1
+	end
+
+  local release_bomb=self.bomb_input_timer==7 or (not bomb_pressed and self.bomb_input_timer>0)
+  if not self.is_bombing and release_bomb then
+    printh(self.bomb_input_timer)
+    local bomb_vy = -self.bomb_input_timer*0.4
+    local bomb_vx = self.facing*self.bomb_input_timer*0.2 + self.vx*0.6
+    self.is_bombing=true
+    bombs:add(self.x,self.y-1,bomb_vx,bomb_vy)
+		self.throwtimer=7
+	end
+end -- player.bomb_input
+
+function player:movejump()
 	--if standing, or if only just
 	--started falling, then jump
-	if(not p.hit_jump) return false
-	if p.standing then
-		p.vy=min(p.vy,-p.jumpv)
+	if not self.hit_jump then return false end
+
+	if self.standing then
+		self.vy=min(self.vy,-self.jumpv)
 	-- allow walljump if sliding
-	elseif p.wallsliding then
+	elseif self.wallsliding then
 		--use normal jump speed,
 		--but proportionate to how
 		--fast player is currently
 		--sliding down wall
-		p.vy-=p.jumpv
-		p.vy=mid(p.vy,-p.jumpv/3,-p.jumpv)
+		self.vy-=self.jumpv
+		self.vy=mid(self.vy,-self.jumpv/3,-self.jumpv)
 
 		--set x velocity / direction
 		--based on wall facing
 		--(looking away from wall)
-		p.vx=p.facing*2
-		p.flipx=(p.facing==-1)
+		self.vx=self.facing*2
+		self.flipx=(self.facing==-1)
 
 		sfx(9)
 	end
 end --player.movejump
 
-function player.groundinput(p)
+function player:ground_input()
 	-- pressing left
 	if btn(0) then
-		p.flipx=true
-		p.facing=-1
+		self.flipx=true
+		self.facing=-1
 		--brake if moving in
 		--opposite direction
-		if p.vx>0 then p.vx*=.9 end
-		p.vx-=.2*dt
+		if self.vx>0 then self.vx*=.9 end
+		self.vx-=.2*dt
 	--pressing right
 	elseif btn(1) then
-		p.flipx=false
-		p.facing=1
-		if p.vx<0 then p.vx*=.9 end
-		p.vx+=.2*dt
+		self.flipx=false
+		self.facing=1
+		if self.vx<0 then self.vx*=.9 end
+		self.vx+=.2*dt
 	--pressing neither, slow down
 	--by our friction amount
 	else
-		p.vx*=friction
+		self.vx*=friction
 	end
-end --player.groundinput
+end --player.ground_input
 
-function player:throw_flowerbomb()
-  bombs:add(self.x,self.y-1,self.facing,self.vx)
-end
-
-function player.airinput(p)
+function player:air_input()
 	if btn(0) then
-		p.vx-=0.15*dt
+		self.vx-=0.15*dt
 	elseif btn(1) then
-		p.vx+=0.15*dt
+		self.vx+=0.15*dt
 	end
-end --player.airinput
+end --player.air_input
 
-function player.movex(p)
+function player:movex()
 	--xsteps is the number of
 	--pixels we think we'll move
 	--based on player.vx
-	local xsteps=abs(p.vx)*dt
+	local xsteps=abs(self.vx)*dt
 
 	--for each pixel we're
 	--potentially x-moving,
@@ -875,82 +879,82 @@ function player.movex(p)
 	for i=xsteps,0,-1 do
 		--our step amount is the
 		--smaller of 1 or the current
-		--i, since p.vx can be a
+		--i, since self.vx can be a
 		--decimal, multiplied by the
 		--pos/neg sign of velocity
-		local step=min(i,1)*sgn(p.vx)
+		local step=min(i,1)*sgn(self.vx)
 
 		--check for x collision
-		if m_collide(p,'x',step) then
+		if m_collide(self,'x',step) then
 			--if hit, stop x movement
-			p.vx=0
+			self.vx=0
 			break
 		else
 			--move if we didn't hit
-			p.x+=step
+			self.x+=step
 		end
 	end
 end --player.movex
 
-function player.movey(p)
+function player:movey()
 	--always apply gravity
 	--(downward acceleration)
-	p.vy+=gravity*dt
+	self.vy+=gravity*dt
 
-	local ysteps=abs(p.vy)*dt
+	local ysteps=abs(self.vy)*dt
 	for i=ysteps,0,-1 do
-		local step=min(i,1)*sgn(p.vy)
-		if m_collide(p,'y',step) then
+		local step=min(i,1)*sgn(self.vy)
+		if m_collide(self,'y',step) then
 			--y collision detected
 
 			--trigger a landing effect
-			if p.vy > 1 then
-				p.landing_v=p.vy
+			if self.vy > 1 then
+				self.landing_v=self.vy
 			end
 
 			--zero out y velocity and
 			--reset falling timer
-			p.vy=0
-			p.falltimer=0
+			self.vy=0
+			self.falltimer=0
 		else
 			--no y collision detected
-			p.y+=step
-			p.falltimer+=1
+			self.y+=step
+			self.falltimer+=1
 		end
 	end
 end --player.movey
 
-function player.effects(p)
-	if p.standing then
-		p:running_effects()
-		p:landing_effects()
-	elseif p.wallsliding then
-		p:sliding_effects()
+function player:effects()
+	if self.standing then
+		self:running_effects()
+		self:landing_effects()
+	elseif self.wallsliding then
+		self:sliding_effects()
 	end
 
-	p:head_effects()
+	self:head_effects()
 end --player.effects
 
-function player.running_effects(p)
+function player:running_effects()
 		-- updates the run timer to
 		-- inform running animation
 
 		-- if we're slow/still, then
 		-- zero out the run timer
-		if abs(p.vx)<.3 then
-			p.runtimer=0
+		if abs(self.vx)<.3 then
+			self.runtimer=0
 		-- otherwise if we're moving,
 		-- tick the run timer and
 		-- spawn running particles
 		else
-			local oruntimer=p.runtimer
-			p.runtimer+=abs(p.vx)*runanimspeed
-			if flr(oruntimer)!=flr(p.runtimer) then
+			local oruntimer=self.runtimer
+			self.runtimer+=abs(self.vx)*runanimspeed
+			if flr(oruntimer)!=flr(self.runtimer) then
 				spawnp(
-					p.x,     --x pos
-					p.y+2,   --y pos
-					-p.vx/3, --x vel
-					-abs(p.vx)/6,--y vel,
+					self.x,     --x pos
+					self.y+2,   --y pos
+					-self.vx/3, --x vel
+					-abs(self.vx)/6,--y vel,
 					.5 --jitter amount
 				)
 			end
@@ -958,19 +962,19 @@ function player.running_effects(p)
 
 		--update the "landed" timer
 		--for crouching animation
-		if p.landtimer>0 then
-			p.landtimer-=0.4
+		if self.landtimer>0 then
+			self.landtimer-=0.4
 		end
 end
 
-function player.landing_effects(p)
+function player:landing_effects()
 	--only spawn landing effects
 	--if we've a landing velocity
-	if(not p.landing_v) return
+	if not self.landing_v then return end
 
 	--play a landing sound
 	--based on current y speed
-	if p.landing_v>5 then
+	if self.landing_v>5 then
 		sfx(15)
 	else
 		sfx(14)
@@ -978,61 +982,64 @@ function player.landing_effects(p)
 
 	--set the landing timer
 	--based on current speed
-	p.landtimer=p.landing_v
+	self.landtimer=self.landing_v
 
 	--spawn landing particles
-	for j=0,p.landing_v*2 do
+	for j=0,self.landing_v*2 do
 		spawnp(
-			p.x,
-			p.y+2,
-			p.landing_v/8*(rnd(2)-1),
-			-p.landing_v/7*rnd(),
+			self.x,
+			self.y+2,
+			self.landing_v/8*(rnd(2)-1),
+			-self.landing_v/7*rnd(),
 			.3
 		)
 	end
 
 	--slight camera shake
-	--shakevy+=p.landing_v/6
+	--shakevy+=self.landing_v/6
 
 	--reset landing velocity
-	p.landing_v=nil
+	self.landing_v=nil
 end
 
-function player.sliding_effects(p)
-		local oruntimer=p.runtimer
-		p.runtimer-=p.vy*wallrunanimspeed
+function player:sliding_effects()
+		local oruntimer=self.runtimer
+		self.runtimer-=self.vy*wallrunanimspeed
 
-		if flr(oruntimer)!=flr(p.runtimer) then
+		if flr(oruntimer)!=flr(self.runtimer) then
 			spawnp(
-				p.x-p.facing,
-				p.y+1,
-				p.facing*abs(p.vy)/4,
+				self.x-self.facing,
+				self.y+1,
+				self.facing*abs(self.vy)/4,
 				0,
 				0.2
 			)
 		end
 end
 
-function player.head_effects(p)
-	if p.etimer%19==0 then
+function player:head_effects()
+	if self.etimer%19==0 then
 		local ex,evx,edir
-		edir=p.prevf and -1 or 1
+		edir=self.prevf and -1 or 1
 		spawnp(
-			p.prevx,
-			p.prevy - p.hr,
+			self.prevx,
+			self.prevy - self.hr,
 			-edir*0.3, -- x vel
 			-0.1, -- y vel
 			0, --jitter
 			10, -- color
 			.7 -- duration
 			)
-		p.prevx=p.x
-		p.prevy=p.y
-		p.prevf=p.flipx
+		self.prevx=self.x
+		self.prevy=self.y
+		self.prevf=self.flipx
 	end
 
-	p.etimer+=1
-	if(p.etimer>20) p.etimer=1
+	self.etimer+=1
+
+	if self.etimer>20 then
+    self.etimer=1
+  end
 end
 
 -- spawn a particle effect
@@ -1329,15 +1336,18 @@ function bomb_class:collide_callback(collision)
   -- when a bomb x-collides with wall, bounce back
   if collision.axis=='x' then
     self.vx=-self.vx/4
-    -- only explode when a bomb hits the floor
   elseif collision.axis=='y' then
+    -- only explode when a bomb is moving downward
     if self.vy>0 then
+      -- dud if the tile is not plantable
       if not is_plantable(collision.cx,collision.cy) then
         self:dud()
       else
         self:explode()
       end
     else
+      -- if we collided moving upward, we hit the ceiling
+      -- then fall back down
       self.vy=0
     end
   end
@@ -1386,12 +1396,8 @@ function bombs.update(b)
 	for _,bomb in pairs(b.list) do bomb:move() end
 end -- bombs.update()
 
-function bombs:add(x,y,dir,vx)
-	add(self.list,bomb_class:new({
-    x=x,
-    y=y,
-    vx=(.5+rnd(.25))*dir + (vx*0.6),
-}))
+function bombs:add(x,y,vx,vy)
+  add(self.list,bomb_class:new({x=x,y=y,vy=vy,vx=vx}))
 end
 
 explosions={}
