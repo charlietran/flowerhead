@@ -290,7 +290,6 @@ function levels.setup(lvl)
     end
   end
 
-  -- get closed door location, if there
   levels.set_spawn(lvl)
 end
 
@@ -525,7 +524,7 @@ function entity_class:move()
 	local step,collision
 	for i=xsteps,0,-1 do
 		step=min(i,1)*sgn(self.vx)
-		collision=collide(self,'x',step)
+		collision=m_collide(self,'x',step)
 		if collision then
 			self:collide_callback(collision)
 			break
@@ -541,7 +540,7 @@ function entity_class:move()
 	local ysteps=abs(self.vy)*dt
 	for i=ysteps,0,-1 do
 		step=min(i,1)*sgn(self.vy)
-		collision=collide(self,'y',step)
+		collision=m_collide(self,'y',step)
 		if collision then
 			self:collide_callback(collision)
 			break
@@ -744,13 +743,13 @@ end
 function player:checksliding()
 	self.wallsliding=false
 	--sliding on wall to the right?
-  if not collide(self,'y',1) then
-    if collide(self,'x',1) then
+  if not m_collide(self,'y',1) then
+    if m_collide(self,'x',1) then
       self.wallsliding=true
       self.facing=-1
       if self.vy>0 then self.vy*=.97 end
     --sliding on wall to the left?
-    elseif collide(self,'x',-1) then
+    elseif m_collide(self,'x',-1) then
       self.wallsliding=true
       self.facing=1
       if self.vy>0 then self.vy*=.97 end
@@ -880,7 +879,7 @@ function player.movex(p)
 		local step=min(i,1)*sgn(p.vx)
 
 		--check for x collision
-		if collide(p,'x',step) then
+		if m_collide(p,'x',step) then
 			--if hit, stop x movement
 			p.vx=0
 			break
@@ -899,7 +898,7 @@ function player.movey(p)
 	local ysteps=abs(p.vy)*dt
 	for i=ysteps,0,-1 do
 		local step=min(i,1)*sgn(p.vy)
-		if collide(p,'y',step) then
+		if m_collide(p,'y',step) then
 			--y collision detected
 
 			--trigger a landing effect
@@ -1113,28 +1112,28 @@ function col_points(p,a,v)
 	return x1,y1,x2,y2
 end
 
+-- map collision check
 -- check if the given entity (e)
 -- collides on the axis (a)
 -- within the distance (d)
-function collide(e,a,d,nearonly)
+function m_collide(entity,axis,distance,nearonly)
 	-- init hitmover checks
 	justhitmover=false
 	lasthitmover=nil
 
-	-- get the 2 corners that
-	-- should be checked
-	x1,y1,x2,y2=col_points(e,a,d)
+	-- get the 2 corners that should be checked
+	x1,y1,x2,y2=col_points(entity,axis,distance)
 
 	-- add our potential movement
-	if a=='x' then
-		x1+=d
-		x2+=d
+	if axis=='x' then
+		x1+=distance
+		x2+=distance
 	else
-		y1+=d
-		y2+=d
+		y1+=distance
+		y2+=distance
 	end
 
-  local coll={axis=a}
+  local coll={axis=axis}
 
 	-- query our 2 points to see
 	-- what tile types they're in
@@ -1142,29 +1141,23 @@ function collide(e,a,d,nearonly)
 	local tile1=mget(cx1,cy1)
 	local tile2=mget(cx2,cy2)
 
-  -- start the exit timer when player touches door
-  if not levels.current.exited and e.is_player and (is_open_exit(tile1) or is_open_exit(tile2)) then
-    e.exit_timer+=1
-  end
-
   if is_spike(tile1) or is_spike(tile2) then
-    e:hit_spike()
+    entity:hit_spike()
+    return
   end
 
-	-- "nearonly" indicates we only
-	-- want to know if our near
-	-- corner will be in a wall
-	if nearonly and is_wall(tile1) and (tile1!=2 or y1%8<4) then
+  -- start the exit timer when player touches door
+  local player_exiting = entity.is_player
+                          and not levels.current.exited
+                          and (is_open_exit(tile1) or is_open_exit(tile2))
+  if player_exiting then player.exit_timer+=1 end
+
+  -- check if either corner will hit a wall
+  if is_wall(tile1) then
     coll.tile,coll.cx,coll.cy=tile1,cx1,cy1
-	elseif not nearonly then
-    --if not nearonly, check if
-    --either corner will hit a wall
-    if is_wall(tile1) then
-      coll.tile,coll.cx,coll.cy=tile1,cx1,cy1
-    elseif is_wall(tile2) then
-      coll.tile,coll.cx,coll.cy=tile2,cx2,cy2
-    end
-	end
+  elseif is_wall(tile2) then
+    coll.tile,coll.cx,coll.cy=tile2,cx2,cy2
+  end
 
   if coll.tile then
     return coll
