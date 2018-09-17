@@ -1363,24 +1363,26 @@ function bomb_class:dud()
   del(bombs.list,self)
 end
 
-laffs={"woo","haa","hoo","hee","hii","yaa"}
 function bomb_class:explode()
 	explosions.add(self.x,self.y,4)
   local prev_planted=levels.current.planted
 	for i=self.x+bombs.plant_radius,self.x-bombs.plant_radius,-1 do
 		grasses.plant(i,self.y)
 	end
-  if levels.current.planted-prev_planted>4 then
-    local laff={x=self.x,y=self.y,t=laffs[ceil(rnd(6))]}
-    deferred_animate(laff,{
-        x=self.x,y=self.y-10,duration=60,
-        draw=function() print(laff.t,laff.x+cos(t()),laff.y,3) end
-    })
-  end
+  laff(self.x,self.y)
 	sfx(40,-1)
 	sfx(41,-1)
 	cam:shake(6,1)
 	del(bombs.list,self)
+end
+
+laffs={"woo","haa","hoo","hee","hii","yaa"}
+function laff(x,y)
+  local laff={x=x,y=y,t=laffs[ceil(rnd(6))],col=3+8*flr(rnd(2))}
+  deferred_animate(laff,{
+    x=x,y=y-10,duration=60,
+    draw=function() print(laff.t,laff.x+cos(t()),laff.y,laff.col) end
+  })
 end
 
 bombs={
