@@ -721,14 +721,12 @@ end
 function player:update()
 	if self.dead then
     player.dying_timer-=1
-    if self.dying_timer<=0 then
-      if(current_game_mode.is_game) reset_level()
-		end
+    if self.dying_timer<=0 then reset_level() end
 		return false
   end
 
   -- only exit once we've touched the door for 15 frames
-  if self.exit_timer >= 15 then
+  if self.exit_timer >= 5 then
     game_mode.lvl_complete:start()
     return
   end
