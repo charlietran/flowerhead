@@ -7,13 +7,14 @@ __lua__
 game_mode={
   intro={is_intro=1},
   game={is_game=1},
-  lvl_complete={is_lvl_complete=1,lines={}},
+  lvl_complete={is_lvl_complete=1},
   outro={is_outro=1},
-  debug_menu={}
+  debug_menu={is_debug_menu=1},
 }
-current_game_mode=game_mode.intro
 
 function _init()
+  current_game_mode=game_mode.intro
+
 	printh("------\n")
 
 	gravity=.2
@@ -192,49 +193,47 @@ function clouds:draw()
 	fillp()
 end
 
-levels={
-	index=1, -- current lvl index
-	list={}
-}
-
-levels.list[1]={
-  cx1=0,cy1=0,
-  timer_disabled=true,
-  banner={
-    title="level 1",
-    caption="welcome to the dungeon"
-  }
-}
-levels.list[2]={
-  cx1=16,cy1=0,
-  enemies_disabled=true,timer_disabled=true,
-  banner={
-    title="level 2",
-    caption="plant some flowers!"
-  }
-}
-levels.list[3]={
-  cx1=94,cy1=28,
-  enemies_disabled=true,timer_disabled=true,
-  banner={
-    title="level 3",
-    caption=""
-  }
-}
+levels={ list={} }
 
 -- find each level block, add
 -- it to the list with coords
 function levels:init()
-	-- tile 6 is bottom right
-	-- tile 7 is bottom left
-	-- tile 8 is the top left
-	-- tile 9 is top right
+  -- reload map data from cartridge
+  reload(0x2000, 0x2000, 0x1000)
+
+  -- level list --
+  levels.list[1]={
+    cx1=0,cy1=0,
+    timer_disabled=true,
+    banner={
+      title="level 1",
+      caption="welcome to the dungeon"
+    }
+  }
+  levels.list[2]={
+    cx1=16,cy1=0,
+    enemies_disabled=true,timer_disabled=true,
+    banner={
+      title="level 2",
+      caption="plant some flowers!"
+    }
+  }
+  levels.list[3]={
+    cx1=94,cy1=28,
+    enemies_disabled=true,
+    timer_disabled=true,
+    banner={
+      title="level 3",
+      caption=""
+    }
+  }
+
   for level in all(levels.list) do
     levels.setup(level)
   end
 
+  levels.index=1
 	levels.current=levels.list[1]
-
 end -- levels:init
 
 function levels.setup(lvl)
@@ -615,6 +614,11 @@ function player:init()
 	--facing away from a wall
 	--while sliding
 	self.facing=1
+
+  --bomb input state
+  self.throw_bomb=false
+  self.is_bombing=false
+  self.bomb_input_timer=0
 
 	--timers used for animation
 	--states and particle fx
@@ -1763,18 +1767,11 @@ function tutorials:draw()
 	end
 end
 
-outro={}
-function outro:init()
+function game_mode.outro:update()
+	if btnp(4) then _init() end
 end
 
-function outro:update()
-	if btnp(4) then
-		reset_level()
-		current_game_mode=game_mode.intro
-	end
-end
-
-function outro:draw()
+function game_mode.outro:draw()
 	cls()
 	music(-1,50)
 	camera(0,0)
