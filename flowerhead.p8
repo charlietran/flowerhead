@@ -35,6 +35,9 @@ function _init()
   coroutines={}
   deferred_draws={}
 
+  -- holds all entities
+  world={player}
+
 	game_mode.intro:init()
 	clouds:init()
 	cam:init()
@@ -498,64 +501,85 @@ end
 -- and can be destroyed
 
 entity_class={
-		x=0, y=0, vx=0, vy=0,
-		w=0, h=0, wr=0, hr=0,
-		anim={timer=0,frames=0,speed=1},
-		spr_x=0,spr_y=0,
-		flipx=false,
-		dead=false,
-		dying=false,
-		has_gravity=true,
-		collide_callback=function(self,collision) end,
-		die=function(self) self.dead=true end
+  x=0, y=0, vx=0, vy=0,
+  w=0, h=0, wr=0, hr=0,
+  anim={timer=0,frames=0,speed=1},
+  spr_x=0,spr_y=0,
+  flipx=false,
+  dead=false,
+  dying=false,
+  map_collide=true,
+  entity_collide=false,
+  has_gravity=true,
+  m_collide_callback=function(self,collision) end
 }
 
 function entity_class:new(o)
-	return setmetatable(o or {}, {__index=entity_class})
+  local e = setmetatable(o or {}, {__index=entity_class})
+  return add(world,e)
 end
 
-function entity_class:collide_callback(collision)
+function entity_class:m_collide_callback(collision)
+end
+
+function entity_class:die()
+  self.dead=true
+  del(world,self)
 end
 
 function entity_class:move()
-	-- move through all our x steps, then our y steps
-	local xsteps=abs(self.vx)*dt
-	local step,collision
-	for i=xsteps,0,-1 do
-		step=min(i,1)*sgn(self.vx)
-		collision=m_collide(self,'x',step)
-		if collision then
-			self:collide_callback(collision)
-			break
-		else
-			self.x+=step
-		end
-	end
+  -- move through all our x steps, then our y steps
+  local xsteps=abs(self.vx)*dt
+  local step,collision
+  for i=xsteps,0,-1 do
+    step=min(i,1)*sgn(self.vx)
+    collision=self.map_collide and m_collide(self,'x',step)
+    if collision then
+      self:m_collide_callback(collision)
+      break
+    else
+      self:check_e_collisions()
+      self.x+=step
+    end
+  end
 
-	if self.has_gravity then
-		self.vy+=gravity*dt
-	end
+  if self.has_gravity then
+    self.vy+=gravity*dt
+  end
 
-	local ysteps=abs(self.vy)*dt
-	for i=ysteps,0,-1 do
-		step=min(i,1)*sgn(self.vy)
-		collision=m_collide(self,'y',step)
-		if collision then
-			self:collide_callback(collision)
-			break
-		else
-			self.y+=step
-		end
-	end
+  local ysteps=abs(self.vy)*dt
+  for i=ysteps,0,-1 do
+    step=min(i,1)*sgn(self.vy)
+    collision=self.map_collide and m_collide(self,'y',step)
+    if collision then
+      self:m_collide_callback(collision)
+      break
+    else
+      self:check_e_collisions()
+      self.y+=step
+    end
+  end
+end
+
+function entity_class:check_e_collisions()
+  for _,entity in pairs(world) do
+    if entity ~= self then
+      if e_collide(self,entity) then
+        self:e_collide_callback(entity)
+        return true
+      end
+    end
+  end
+end
+
+function entity_class:e_collide_callback(entity)
+  printh(self.name.." collided with "..entity.name)
 end
 
 function entity_class:animate()
-	if(self.dead) return
+	if self.dead then return end
 
-	self.anim.timer += self.anim.speed
-	if self.anim.timer >= self.anim.frames then
-		self.anim.timer=0
-	end
+	self.anim.timer = (self.anim.timer+self.anim.speed) % self.anim.frames
 
 	sspr(
 		self.spr_x + flr(self.anim.timer)*self.w,self.spr_y,
@@ -568,7 +592,11 @@ end
 
 --------------------------------
 --player object-----------------
-player={}
+player={
+  name="player",
+  scale=1,
+}
+setmetatable(player,{__index=entity_class})
 
 function player:init()
   self.is_player=1
@@ -660,11 +688,7 @@ function player:init()
 end
 
 function player:draw()
-	if player.dead then
-		player:draw_death()
-		return
-	end
-
+  if self.dead then return end
 	self.headanimtimer=self.headanimtimer%3+1
 
 	--if throwing, draw swoosh
@@ -715,9 +739,6 @@ function player:draw()
 	)
 end
 
-function player:draw_death()
-end
-
 function player:update()
 	if self.dead then
     player.dying_timer-=1
@@ -733,7 +754,10 @@ function player:update()
 
 	self.standing=self.falltimer<7
 
-	if(not self.disable_input) self:handleinput()
+  if not self.disable_input then
+    self:handleinput()
+  end
+
 	--move the player, x then y
 	self:movex()
 	self:movey()
@@ -802,7 +826,6 @@ function player:bomb_input()
 
   local release_bomb=self.bomb_input_timer==7 or (not bomb_pressed and self.bomb_input_timer>0)
   if not self.is_bombing and release_bomb then
-    printh(self.bomb_input_timer)
     local bomb_vy = -self.bomb_input_timer*0.4
     local bomb_vx = self.facing*self.bomb_input_timer*0.2 + self.vx*0.6
     self.is_bombing=true
@@ -958,7 +981,7 @@ function player:running_effects()
 					.5 --jitter amount
 				)
 			end
-		end
+    end
 
 		--update the "landed" timer
 		--for crouching animation
@@ -1062,6 +1085,7 @@ function spawnp(x,y,vx,vy,jitter,c,d)
 end
 
 function player:hit_spike()
+  if self.dead then return end
 	self.dead=true
 	self.dying_timer=30
 	for i=1,100 do
@@ -1082,11 +1106,11 @@ end
 --collision code----------------
 --------------------------------
 
--- given an agent and velocity,
+-- given entity, axis, direction,
 -- this returns the coords of
 -- which two coords should
 -- be checked for collisions
-function col_points(p,a,v)
+function col_points(entity,axis,direction)
 	local x1,x2,y1,y2
 
 	-- x movement and y movement
@@ -1094,24 +1118,24 @@ function col_points(p,a,v)
 	-- this func is called, we only
 	-- need to check one axis
 
-	if a=='x' then
+	if axis=='x' then
 		-- if we have x-velocity, then
 		-- return the coords for the
 		-- right edge or left edge of
 		-- our agent sprite
-		x1=p.x+sgn(v)*p.wr
-		y1=p.y-p.hr
+		x1=entity.x+direction*entity.wr
+		y1=entity.y-entity.hr
 		x2=x1
-		y2=p.y+p.hr
-	elseif a=='y' then
+		y2=entity.y+entity.hr
+	elseif axis=='y' then
 		-- if we have y-velocity, then
 		-- return the coords for the
 		-- top edge or bottom edge of
 		-- our p sprite
-		x1=p.x-p.wr
-		y1=p.y+sgn(v)*p.hr
+		x1=entity.x-entity.wr
+		y1=entity.y+direction*entity.hr
 		y2=y1
-		x2=p.x+p.wr
+		x2=entity.x+entity.wr
 	end
 
 	-- x1,y1 now represents the
@@ -1173,6 +1197,22 @@ function m_collide(entity,axis,distance,nearonly)
   else
     return false
   end
+end
+
+-- entity collisions
+function e_collide(obj, other)
+    if
+        -- other right edge is past obj left edge
+        other.x+other.wr*other.scale > obj.x-obj.wr*obj.scale and
+        -- other bottom edge is past obj to edge
+        other.y+other.hr*other.scale > obj.y-obj.hr*obj.scale and
+        -- other left edge is before obj right edge
+        other.x-other.wr*other.scale < obj.x+obj.wr*obj.scale and
+        -- other top edge is before obj bottom edge
+        other.y-other.hr*other.scale < obj.y+obj.hr*obj.scale
+    then
+        return true
+    end
 end
 
 -- sprite flags:
@@ -1329,10 +1369,10 @@ bomb_class={
 setmetatable(bomb_class,{__index=entity_class})
 
 function bomb_class:new(obj)
-  return setmetatable(obj or {}, {__index=bomb_class})
+  return setmetatable(entity_class:new(obj or {}), {__index=bomb_class})
 end
 
-function bomb_class:collide_callback(collision)
+function bomb_class:m_collide_callback(collision)
   -- when a bomb x-collides with wall, bounce back
   if collision.axis=='x' then
     self.vx=-self.vx/4
@@ -1353,6 +1393,9 @@ function bomb_class:collide_callback(collision)
   end
 end
 
+function bomb_class:e_collide_callback(entity)
+end
+
 function bomb_class:hit_spike()
   self:dud()
 end
@@ -1361,6 +1404,7 @@ function bomb_class:dud()
 	explosions.add(self.x,self.y+2,2)
   sfx(41,3,1)
   del(bombs.list,self)
+  self:die()
 end
 
 function bomb_class:explode()
@@ -1374,6 +1418,7 @@ function bomb_class:explode()
 	sfx(41,-1)
 	cam:shake(6,1)
 	del(bombs.list,self)
+  self:die()
 end
 
 laffs={"woo","haa","hoo","hee","hii","yaa"}
@@ -1632,6 +1677,7 @@ end
 --the bees----------------------
 --------------------------------
 bee_class={
+  name="bee",
 	anim={timer=0,frames=3,speed=1/4},
   spr_x=64,spr_y=8,
   is_bee=true,
@@ -1653,7 +1699,7 @@ end
 function bee_class:new(obj)
   local bee=obj or {}
 	bee.pathfinder=pathfinder_class:new(bee)
-  return setmetatable(obj or {}, {__index=bee_class})
+  return setmetatable(bee, {__index=bee_class})
 end
 
 function bee_class:jitter()
@@ -1680,6 +1726,19 @@ function bees:update()
 			bee:jitter()
 			bee:move()
 		end
+function bee_class:e_collide_callback(entity)
+  if self.spawning then return end
+  if entity.is_player then
+    entity:hit_spike()
+    bees:recall()
+  elseif entity.is_bomb then
+    entity:dud()
+    self.scale+=.2
+    if self.scale >= 2 then
+      self:die()
+    end
+  end
+end
 	end
 end
 
