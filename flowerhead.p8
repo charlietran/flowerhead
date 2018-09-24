@@ -335,11 +335,13 @@ function level_class:make_door_anim(x,y)
       -- pointing away from the player
       local dmod=-0.7*cos(dmod_angle)*(1-.2*cos(t/4))
 
+      fillp(0b0011100111000110.1)
       line(
         x,y,
         x+dmod*distance*cos(tmod),
         y+dmod*distance*sin(tmod),
         10)
+      fillp()
     end
   end
 end
