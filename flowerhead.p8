@@ -2031,47 +2031,98 @@ function pathfinder_class:update(target_entity)
 	self.cost_so_far={}
 	self.cost_so_far[start_index]=0
 
-	self.agent.visited={}
+	self.visited={}
+
+  self.search_bound=manhattan_distance(start_cell,self.goal_cell)
+  printh("search bound:"..self.search_bound)
 
 	local path_cell = self:search_frontier()
-
-	self.agent.path={path_cell,self.goal_cell}
+	self.path={path_cell,self.goal_cell}
 	local path_index=cell_to_index(path_cell)
 
 	while path_index != start_index do
-		insert(self.agent.path, path_cell)
+		insert(self.path, path_cell)
 		path_cell = self.came_from[path_index].cell
 		path_index = self.came_from[path_index].index
 	end
 end
 
+function pathfinder_class:map_costs()
+  self.costs={}
+  self.adjusted={}
+
+  -- init cost value for all movable tiles
+  for cy=levels.current.cy1,levels.current.cy2 do
+    self.costs[cy]=self.costs[cy] or {}
+    self.adjusted[cy]=self.adjusted[cy] or {}
+    for cx=levels.current.cx1,levels.current.cx2 do
+      self.costs[cy][cx]=levels.current.obstacles[cy][cx] and 'x' or (levels.current.cx2-levels.current.cx1)+(levels.current.cy2-levels.current.cy1)
+    end
+  end
+
+  -- set goal spaces
+  local goals={
+    pos_to_cell(player.x+player.wr,player.y+player.hr)
+  }
+
+  -- scan and adjust costs
+  self:adjust_costs(goals)
+end
+
+function pathfinder_class:adjust_costs(goals)
+  local cx1,cx2,cy1,cy2=levels.current.cx1,levels.current.cx2,levels.current.cy1,levels.current.cy2
+
+  for goal_cell in all(goals) do
+    self.costs[goal_cell[2]][goal_cell[1]]=0
+    local frontier={goal_cell}
+    local checked={}
+    while #frontier > 0 do
+      local current=pop_end(frontier)
+      local cx,cy=current[1],current[2]
+      local current_value=self.costs[cy][cx]
+      local neighbor_checks={ {cx,cy-1}, {cx,cy+1}, {cx-1,cy}, {cx+1,cy}, }
+      for _,check in pairs(neighbor_checks) do
+        local n_cx,n_cy=check[1],check[2]
+        local n_index=cell_to_index({n_cx,n_cy})
+        local n_value=self.costs[n_cy][n_cx]
+        if n_cx>cx1 and n_cx<cx2 and n_cy>cy1 and n_cy<cy2 and
+            n_value~='x' then
+          if self.costs[n_cy][n_cx] > current_value+1 then
+            self.costs[n_cy][n_cx]=current_value+1
+          end
+          if not checked[n_index] then
+            add(frontier,{n_cx,n_cy})
+          end
+        end
+      end
+      checked[cell_to_index({cx,cy})]=true
+    end
+  end
+end
+
+function pathfinder_class:clear_costs()
+  truncate(pathfinder_class.costs)
+end
+
+pathfinder_class.costs={}
+
 function pathfinder_class:search_frontier()
+  start_measure("search frontier")
+  local search_depth=0
 	while #self.frontier>0 do
+    -- grab the first item in priority queue (frontier)
 		local current=pop_end(self.frontier)
+    -- stop searching once goal is found
 		if current.index==self.goal_index then
+      stop_measure("search frontier")
+      printh(search_depth)
 			return current.cell
 		end
 
+    -- get the neighboring cells of current search cell
 		local neighbor_cells=self.get_neighbor_cells(current.cell)
-		for neighbor_cell in all(neighbor_cells) do
-			local neighbor_index=cell_to_index(neighbor_cell)
-			local new_cost=self.cost_so_far[current.index]+1
-
-			if (not self.cost_so_far[neighbor_index]) or (new_cost < self.cost_so_far[neighbor_index]) then
-				add(self.agent.visited,{neighbor_cell,new_cost})
-				self.cost_so_far[neighbor_index]=new_cost
-				if toggles.a_star then
-					insert_sorted(self.frontier, {
-							cell=neighbor_cell,
-							index=neighbor_index,
-							priority=new_cost+manhattan_heuristic(neighbor_cell,self.goal_cell)
-					})
-				else
-					insert(self.frontier,{cell=neighbor_cell,index=neighbor_index})
-				end
-				self.came_from[neighbor_index]=current
-			end
-		end
+    self:expand_frontier(neighbor_cells,current,search_depth)
+    search_depth+=1
 	end -- while #frontier>0
 end
 
@@ -2081,7 +2132,7 @@ function pathfinder_class.get_neighbor_cells(cell)
   local lvl=levels.current
 	local x,y=cell[1],cell[2]
 
-	local neighbor_cells={
+	local possible_neighbors={
 		{x-1,y-1},
 		{x,y-1},
 		{x+1,y-1},
@@ -2092,14 +2143,11 @@ function pathfinder_class.get_neighbor_cells(cell)
 		{x+1,y+1}
 	}
 
-	for _,check in pairs(neighbor_cells) do
-		if check[1]>lvl.cx1 and check[1]<lvl.cx2 and
-			check[2]>lvl.cy1 and check[2]<lvl.cy2 and
-			not is_wall(mget(check[1],check[2])) and
-			not is_spike(mget(check[1],check[2]))
-		then
-			add(neighbors,check)
-		end
+	for _,pn in pairs(possible_neighbors) do
+    local admissible=pn[1]>lvl.cx1 and pn[1]<lvl.cx2 and
+                     pn[2]>lvl.cy1 and pn[2]<lvl.cy2 and
+                     not lvl.obstacles[pn[2]][pn[1]]
+		if admissible then add(neighbors,pn) end
 	end
 
 	if (cell[1] + cell[2])%2 == 0 then
@@ -2109,31 +2157,45 @@ function pathfinder_class.get_neighbor_cells(cell)
   return neighbors
 end
 
-function pathfinder_class:aim(agent)
-	local next_cell = agent.path[1]
-	if(not next_cell) return
+function pathfinder_class:expand_frontier(neighbor_cells,current,search_depth)
+  for neighbor_cell in all(neighbor_cells) do
+    local neighbor_index=cell_to_index(neighbor_cell)
+    local new_cost=self.cost_so_far[current.index]+1
 
-	if(agent.cx == next_cell[1] and agent.cy == next_cell[2]) do
-		del(agent.path,next_cell)
-		next_cell = agent.path[1]
-		if(not next_cell) return
-	end
-	agent.next_cell=next_cell
+    -- a* epsilon weighting
+    local e=.6
+    local weight=1
+    if search_depth <= self.search_bound then
+      weight=1+e*(1-search_depth/self.search_bound)
+    end
 
-	local targetx = next_cell[1]*8+4
-	local targety = next_cell[2]*8+4
-
-	if(targetx<agent.x) agent.vx=max(agent.vx-agent.vx_turning,-agent.max_vx)
-	if(targetx>agent.x) agent.vx=min(agent.vx+agent.vx_turning,agent.max_vx)
-	if(targetx==flr(agent.x)) agent.vx=0
-	agent.flipx=agent.vx<0
-
-
-	if(targety<agent.y) agent.vy=max(agent.vy-agent.vy_turning,-agent.max_vy)
-	if(targety>agent.y) agent.vy=min(agent.vy+agent.vy_turning,agent.max_vy)
-	if(targety==flr(agent.y)) agent.vy=0
+    if (not self.cost_so_far[neighbor_index]) or (new_cost < self.cost_so_far[neighbor_index]) then
+      add(self.visited,{neighbor_cell,new_cost})
+      self.cost_so_far[neighbor_index]=new_cost
+      if toggles.a_star then
+        insert_sorted(self.frontier,{
+          cell=neighbor_cell,
+          index=neighbor_index,
+          priority=new_cost+weight*manhattan_distance(neighbor_cell,self.goal_cell)
+        })
+      else
+        insert(self.frontier,{cell=neighbor_cell,index=neighbor_index})
+      end
+      self.came_from[neighbor_index]=current
+    end
+  end
 end
 
+function pathfinder_class:next_target()
+  local next_cell = self.path[1]
+  if not next_cell then return end
+	if self.agent.cx == next_cell[1] and self.agent.cy == next_cell[2] then
+		del(self.path,next_cell)
+		next_cell = self.path[1]
+		if not next_cell then return end
+	end
+  return next_cell[1]*8+4,next_cell[2]*8+4
+end
 
 -- utility functions
 --------------------------------
@@ -2143,8 +2205,10 @@ function truncate(tbl)
 	end
 end
 
-function manhattan_heuristic(start, target)
-	return abs(start[1]-target[1]) + abs(start[2]-target[2])
+function manhattan_distance(start, target)
+	local m = abs(start[1]-target[1]) + abs(start[2]-target[2])
+	local c = max( abs(start[1]-target[1]) , abs(start[2]-target[2]) )
+  return (m+c)/2
 end
 -- converts x/y coordinate to map cell coords
 function pos_to_cell(x,y)
