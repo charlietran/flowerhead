@@ -36,7 +36,7 @@ function _init()
   deferred_draws={}
 
   -- holds all entities
-  world={player}
+  entities={player}
 
   game_mode.intro:init()
   clouds:init()
@@ -505,7 +505,7 @@ function banners:add(level)
 
   --------------------------------
   --entities----------------------
-  -- describes a world object that
+  -- describes a game object that
   -- has a position, velocity, a
   -- sprite to draw, collides
   -- with the map or other entities
@@ -528,7 +528,7 @@ function banners:add(level)
 
   function entity_class:new(o)
     local e = setmetatable(o or {}, {__index=entity_class})
-    return add(world,e)
+    return add(entities,e)
   end
 
   function entity_class:m_collide_callback(collision)
@@ -536,7 +536,7 @@ function banners:add(level)
 
   function entity_class:die()
     self.dead=true
-    del(world,self)
+    del(entities,self)
   end
 
   function entity_class:move()
@@ -574,7 +574,7 @@ function banners:add(level)
   end
 
   function entity_class:check_e_collisions()
-    for _,entity in pairs(world) do
+    for _,entity in pairs(entities) do
       if entity ~= self then
         if e_collide(self,entity) then
           self:e_collide_callback(entity)
@@ -1823,7 +1823,7 @@ function banners:add(level)
   function bee_class:die()
     self.dead=true
     del(bees.list,self)
-    del(world,self)
+    del(entities,self)
     for i=1,64 do
       spawnp(
         self.x,
