@@ -406,19 +406,18 @@ end
 
 banners={list={}}
 
-function banners:add(_banner)
+function banners:add(level)
   local banner={
-    title=_banner.title or "",
-    caption=_banner.caption or "",
-    height=_banner.height or 32,
-    x=0,
+    title="level "..level.index,
+    caption=level.desc,
+    height=level.banner_height or 32,
+    x=0
   }
   banner.y=-banner.height -- start banner off screen
   add(self.list,banner)
 
-  local anim1={duration=45,x=0,y=0}
-  local anim2={duration=45,x=0,y=-banner.height,
-               easing=ease_in_quad}
+  local anim1={duration=45,props={x=0,y=0}}
+  local anim2={duration=45,props={x=0,y=-banner.height},easing=ease_in_quad}
   local seq=coroutine_sequence({
     make_animation(banner,anim1),
     make_delay(30),
@@ -467,8 +466,8 @@ function game_mode.lvl_complete:start()
 
 	self.box1={x=cam.x-64,y=cam.y-64-127,w=127,h=127,color=1}
 	self.box2={x=cam.x-64,y=cam.y+64,w=127,h=127,color=1}
-	deferred_animate(self.box1,{x=cam.x-64,y=player.y-15-127,duration=30})
-	deferred_animate(self.box2,{x=cam.x-64,y=player.y+15,duration=30})
+	deferred_animate(self.box1,{props={x=cam.x-64,y=player.y-15-127},duration=30})
+	deferred_animate(self.box2,{props={x=cam.x-64,y=player.y+15},duration=30})
   add(coroutines,coroutine_sequence({
       make_delay(120),
       function()
@@ -1426,7 +1425,7 @@ laffs={"woo","haa","hoo","hee","hii","yaa"}
 function laff(x,y)
   local laff={x=x,y=y,t=laffs[ceil(rnd(6))],col=3+8*flr(rnd(2))}
   deferred_animate(laff,{
-    x=x,y=y-10,duration=60,
+    props={x=x,y=y-10},duration=60,
     draw=function() print(laff.t,laff.x+cos(t()),laff.y,laff.col) end
   })
 end
@@ -2089,22 +2088,36 @@ end
 -- params: {x, y, duration, easing}
 function make_animation(obj,params)
   return function()
-    local x1,y1,x2,y2,dx,dy,duration,easing,percent
-    x1,y1,x2,y2=obj.x,obj.y,params.x,params.y
-    dx,dy=x2-x1,y2-y1
-    duration=params.duration
-    easing=params.easing or ease_out_quad
-    percent=0
-    if(params.draw) add(deferred_draws,params.draw)
+    local duration=params.duration
+    local easing=params.easing or ease_out_quad
+    local percent=0
+
+    local anims={}
+    for property,value in pairs(params.props) do
+      anims[property]={
+        orig=obj[property],
+        target=value,
+        delta=value-obj[property]
+      }
+    end
+
+    if params.draw then add(deferred_draws,params.draw) end
+
     for dt=1,duration do
       percent=easing(dt/duration)
-      obj.x=x1+(percent*dx)
-      obj.y=y1+(percent*dy)
+      for property,anim in pairs(anims) do
+        obj[property]=anim.orig+percent*anim.delta
+      end
       yield()
     end
-    obj.x=x2
-    obj.y=y2
-    if(params.draw) del(deferred_draws,params.draw)
+
+    for property,anim in pairs(anims) do
+      obj[property]=anim.target
+    end
+
+    if params.draw then
+      del(deferred_draws,params.draw)
+    end
   end
 end
 
