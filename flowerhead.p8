@@ -1568,12 +1568,12 @@ function game_mode.intro:update()
   -- spawn speed streaks
   if self.animtimer%2==0 then
     spawnp(
-      16+rnd(96),
       32+rnd(96),
-      -3, -- x vel
-      -3, -- y vel
+      32+rnd(96),
+      -5, -- x vel
+      -5, -- y vel
       0.1, --jitter
-      6, -- color
+      5, -- color
       0.5 -- duration
     )
   end
@@ -1581,8 +1581,8 @@ end
 
 function game_mode.intro:draw()
   cls()
+  clouds:draw()
   specks:draw()
-  map(0,48,0,0,16,16)
 
   local time=t()
 
