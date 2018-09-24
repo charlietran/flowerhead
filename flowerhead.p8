@@ -66,13 +66,12 @@ function _draw()
   for _,deferred in pairs(deferred_draws) do
     deferred()
   end
-  if(toggles.performance) draw_debug()
+  if toggles.performance then draw_debug() end
 end
 
 function game_mode.game:update()
 	gametime+=1
 	cam:update()
-	levels:update()
 	player:update()
 	bees:update()
 	specks:update()
@@ -268,6 +267,16 @@ function level_class:setup()
     end
   end
 
+  -- This bee_index represents at what planted number a bee should spawn
+  -- i.e. if bee_index[5] = true, when tile #5 is planted a bee will spawn
+  self.bee_index={}
+  -- Based on the level's num_bees, distribute the bee spawning evenly
+  for i=1,self.num_bees do
+    local bee_index = flr(i/(self.num_bees+1)*self.plantable)
+    self.bee_index[bee_index]=true
+  end
+
+  self:set_spawn()
 end
 
 function level_class:set_spawn()
@@ -503,6 +512,7 @@ end
 entity_class={
   x=0, y=0, vx=0, vy=0,
   w=0, h=0, wr=0, hr=0,
+  scale=1,
   anim={timer=0,frames=0,speed=1},
   spr_x=0,spr_y=0,
   flipx=false,
@@ -581,11 +591,25 @@ function entity_class:animate()
 
 	self.anim.timer = (self.anim.timer+self.anim.speed) % self.anim.frames
 
+  -- Draw the entity's sprite from the sprite sheet
 	sspr(
-		self.spr_x + flr(self.anim.timer)*self.w,self.spr_y,
-		self.w,self.h,
-		self.x-self.wr,self.y-self.hr,
-		self.w,self.h,
+    -- the sprite's location on the sheet is based on the spr_x and spr_y attributes
+    -- spr_x is multiplied by the anim timer because animation frames are
+    -- laid out x-adjacent on the sprite sheet
+		self.spr_x+flr(self.anim.timer)*self.w,
+    self.spr_y,
+    -- the width and height of our sprite on the sheet are self.w and self.h
+		self.w,
+    self.h,
+    -- the screen coordinates of where to draw the sprite are offset
+    -- by the sprites width radius and height radius, making the sprites
+    -- x and y position the center of where we draw the sprite
+		self.x-self.wr*self.scale,
+    self.y-self.hr*self.scale,
+    -- the final drawn width and height is scaled
+		self.w*self.scale,
+    self.h*self.scale,
+    -- flip drawing on the x axis if self.flipx is true
 		self.flipx
 	)
 end
@@ -1155,7 +1179,7 @@ function m_collide(entity,axis,distance,nearonly)
 	lasthitmover=nil
 
 	-- get the 2 corners that should be checked
-	x1,y1,x2,y2=col_points(entity,axis,distance)
+	x1,y1,x2,y2=col_points(entity,axis,sgn(distance))
 
 	-- add our potential movement
 	if axis=='x' then
@@ -1345,8 +1369,9 @@ function grasses.update_tile(cx,cy)
   -- if a tile has at least 6 (out of 8) grasses planted,
   -- mark it as fully planted
   if grasses.tiles[cy][cx]>=6 then
+    local c=levels.current
     grasses.tiles[cy][cx]=8
-    levels.current.planted+=1
+    c.planted+=1
 
     -- draw the tile differently now that it is planted
     -- the sprite sheet is arbitrarily set up so that
@@ -1354,12 +1379,26 @@ function grasses.update_tile(cx,cy)
     -- to the right
     ot=mget(cx,cy)
     mset(cx,cy,ot+9)
+
+    -- spawn a bee if necessary
+    if c.bee_index[c.planted] then
+      bees:spawn(cx,cy)
+      -- flag that the bee has been spawned
+      c.bee_index[c.planted]=false
+    end
+
+    -- open the door if possible
+    if not c.dooropen and not c.exited and c.planted>=c.plantable then
+      c:open_door()
+    end
   end
 end
 
 --flower bombs------------------
 --------------------------------
 bomb_class={
+  name="bomb",
+  is_bomb=true,
   w=3,h=3,
   wr=1,hr=1,
   vy=-2.5,
@@ -1678,7 +1717,7 @@ end
 --------------------------------
 bee_class={
   name="bee",
-	anim={timer=0,frames=3,speed=1/4},
+  anim={timer=0,frames=3,speed=1/4},
   spr_x=64,spr_y=8,
   is_bee=true,
   has_gravity=false,
@@ -1687,13 +1726,16 @@ bee_class={
   w=7,h=7,wr=3,hr=3,
   flipx=false,
   update_counter=0,
+  update_interval=15,
   max_vx=1,
   max_vy=1,
   path={}
 }
 setmetatable(bee_class,{__index=entity_class})
 
+-- make the bee bounce off spikes
 function bee_class:hit_spike()
+  self.vy=-self.vy
 end
 
 function bee_class:new(obj)
@@ -1707,30 +1749,62 @@ function bee_class:jitter()
 	local offset=sin(time)*0.3
 	self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
-bees={
-  list={},
-	update_interval=15
-}
 
-function bees:update()
-  for _,bee in pairs(bees.list) do
-		bee.update_counter+=1
-		if bee.update_counter == bees.update_interval then
-			bee.update_counter=0
-			bee.pathfinder:update(player)
-		end
-			bee.cx=flr(bee.x/8)
-			bee.cy=flr(bee.y/8)
-			bee.pathfinder:aim(bee)
-		if toggles.bee_move then
-			bee:jitter()
-			bee:move()
-		end
+function bee_class:update()
+  self.update_counter+=1
+  if self.update_counter == self.update_interval then
+    self.update_counter=0
+    self.pathfinder:update(player)
+  end
+
+  if toggles.bee_move then
+    self:set_target()
+    self:steer()
+    self:jitter()
+    self:move()
+  end
+end
+
+function bee_class:draw()
+  if toggles.path_vis then self:draw_paths() end
+  entity_class.draw(self)
+end
+
+function bee_class:set_target()
+  if self.pathfinder.enabled then
+    self.target_x,self.target_y=self.pathfinder:next_target()
+  end
+end
+
+-- adjust bee velocity to move towards target
+function bee_class:steer()
+  if not self.target_x then return end
+	if self.target_x<self.x then
+    self.vx=max(self.vx-self.vx_turning,-self.max_vx*1/self.scale)
+  end
+	if self.target_x>=self.x then
+    self.vx=min(self.vx+self.vx_turning,self.max_vx*1/self.scale)
+  end
+	self.flipx=self.vx<0
+
+	if self.target_y<self.y then
+    self.vy=max(self.vy-self.vy_turning,-self.max_vy*1/self.scale)
+  end
+	if self.target_y>=self.y then
+    self.vy=min(self.vy+self.vy_turning,self.max_vy*1/self.scale)
+  end
+end
+
 function bee_class:e_collide_callback(entity)
+  -- don't collide with ents while spawning
   if self.spawning then return end
+
+  -- kill the player if touching, then recall bees to the door
   if entity.is_player then
     entity:hit_spike()
     bees:recall()
+
+  -- if hit by a bomb, grow 20%, until exploding at 200% escale
   elseif entity.is_bomb then
     entity:dud()
     self.scale+=.2
@@ -1739,48 +1813,131 @@ function bee_class:e_collide_callback(entity)
     end
   end
 end
-	end
+
+function bee_class:die()
+  self.dead=true
+  del(bees.list,self)
+  del(world,self)
+  for i=1,64 do
+    spawnp(
+      self.x,
+      self.y,
+      cos(i/64), -- vx
+      sin(i/64), -- vy
+      1, -- jitter
+      9, -- color
+      .75 -- duration
+      )
+    sfx(42)
+  end
+end
+
+-- Debugging visualization to draw the pathfinding
+-- for each bee
+function bee_class:draw_paths()
+  local pf=self.pathfinder
+  for cell in all(pf.visited) do
+    local px,py=cell[1][1]*8,cell[1][2]*8
+    fillp(0b0000111100001111)
+    rectfill(px,py, px+7,py+7,3)
+    fillp()
+    print(cell[2],px,py+2,11)
+  end
+
+  if pf.next_cell then
+    rectfill(
+      pf.next_cell[1]*8,pf.next_cell[2]*8,
+      pf.next_cell[1]*8+7,pf.next_cell[2]*8+7,
+      7)
+  end
+
+  local points={}
+  for cell in all(pf.path) do
+    add(points,{cell[1]*8+4,cell[2]*8+4})
+  end
+
+  for i=2,#points do
+    local x1=points[i-1][1]
+    local y1=points[i-1][2]
+    local x2=points[i][1]
+    local y2=points[i][2]
+    line(x1,y1,x2,y2,8)
+  end
+end
+
+bees={
+  -- how many frames to delay after spawning for
+  -- bees to start pathfinding the player
+  spawn_pathfinding_delay=60,
+  list={}
+}
+
+function bees:update()
+  for _,bee in pairs(bees.list) do bee:update() end
 end
 
 function bees:draw()
 	for _,bee in pairs(self.list) do
-		if(toggles.path_vis) bees.draw_paths(bee)
-		bee:animate()
+		bee:draw()
 	end
 end
 
-function bees.draw_paths(bee)
-		for cell in all(bee.visited) do
-			local px,py=cell[1][1]*8,cell[1][2]*8
-			fillp(0b0000111100001111)
-			rectfill(px,py, px+7,py+7,3)
-			fillp()
-			print(cell[2],px,py+2,11)
-		end
+function bees:spawn(cx,cy)
+  printh('spawning bee')
 
-		if bee.next_cell then
-			rectfill(
-				bee.next_cell[1]*8,bee.next_cell[2]*8,
-				bee.next_cell[1]*8+7,bee.next_cell[2]*8+7,
-				7)
-		end
+  local bee=bee_class:new()
 
-		local points={}
-		for cell in all(bee.path) do
-			add(points,{cell[1]*8+4,cell[2]*8+4})
-		end
+  -- the bee randomly flies in from left or right
+  local dir=sgn(-1+rnd(2))
+  bee.flipx=-dir
 
-		for i=2,#points do
-			local x1=points[i-1][1]
-			local y1=points[i-1][2]
-			local x2=points[i][1]
-			local y2=points[i][2]
-			line(x1,y1,x2,y2,8)
-		end
+  -- spawn the bee centered above the passed-in cell coordinate
+  bee.x,bee.y=cx*8+bee.wr+dir*32,cy*8-32
+
+  -- bee starts big then zooms down to normal size
+  bee.scale=8
+
+  --
+  bee.pathfinder.enabled=false
+  bee.spawning=true
+  bee.target_x,bee.target_y=cx*8+bee.wr+1,cy*8-8+bee.hr
+
+  local seq=coroutine_sequence({
+    -- make a spawn effect centered above the tile
+    bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
+    -- add our new bee to the bee list
+    function() add(bees.list,bee) end,
+    -- animate the bee zooming from its initial big size down to normal
+    make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},duration=30}),
+    -- after our specified delay, then enable pathfinding
+    make_delay(bees.spawn_pathfinding_delay),
+    function() bee.pathfinder.enabled=true; bee.spawning=false end })
+
+  add(coroutines,seq)
 end
 
-function bees:add(x,y)
-  add(self.list,bee_class:new({x=x,y=y}) )
+-- return a function that draws a "fountain" particle
+-- effect that indicates a bee will spawnt here
+function bees:make_spawn_effect(x,y,vx,vy,duration)
+  return function()
+    for i=1,duration do
+      spawnp(x,y,vx,vy,.25,10)
+      yield()
+    end
+  end
+end
+
+-- Retarget all bees back towards the door
+function bees:recall()
+  for _,bee in pairs(self.list) do
+    bee.pathfinder.enabled=false
+    bee.target_x=levels.current.door_sx
+    bee.target_y=levels.current.door_sy
+    add(coroutines,coroutine_sequence({
+        make_delay(240),
+        function() bee.pathfinder.enabled=true end
+    }))
+  end
 end
 
 --tutorials---------------------
@@ -1846,14 +2003,18 @@ function game_mode.outro:draw()
 end
 
 -- pathfinder class
-pathfinder_class={}
+pathfinder_class={
+  enabled=true,
+  depth_limit=20 -- search depth limit
+}
 
 function pathfinder_class:new(agent)
-	return setmetatable({agent=agent}, {__index=pathfinder_class})
+	return setmetatable({agent=agent,path={}}, {__index=pathfinder_class})
 end
 
 function pathfinder_class:update(target_entity)
-  if(target_entity.dead) return
+  if not self.enabled then return end
+  if target_entity.dead then return end
   -- get the cell coordinate of the target
   self.goal_cell=pos_to_cell(target_entity.x+target_entity.wr,target_entity.y+target_entity.hr)
   self.goal_index=cell_to_index(self.goal_cell)
