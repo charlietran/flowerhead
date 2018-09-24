@@ -118,7 +118,7 @@ function reset_level()
 
   if not levels.current.started then
     levels.current.started=true
-		banners:add(levels.current.banner)
+		banners:add(levels.current)
 		grasses.map={}
 		levels.current.percent_complete=0
 		levels.current.planted=0
@@ -196,164 +196,110 @@ function clouds:draw()
 	fillp()
 end
 
-levels={ list={} }
-
--- find each level block, add
--- it to the list with coords
-function levels:init()
-  -- reload map data from cartridge
-  reload(0x2000, 0x2000, 0x1000)
-
-  -- level list --
-  levels.list[1]={
-    cx1=0,cy1=0,
-    timer_disabled=true,
-    banner={
-      title="level 1",
-      caption="welcome to the dungeon"
-    }
-  }
-  levels.list[2]={
-    cx1=16,cy1=0,
-    enemies_disabled=true,timer_disabled=true,
-    banner={
-      title="level 2",
-      caption="plant some flowers!"
-    }
-  }
-  levels.list[3]={
-    cx1=94,cy1=28,
-    enemies_disabled=true,
-    timer_disabled=true,
-    banner={
-      title="level 3",
-      caption=""
-    }
-  }
-
-  for level in all(levels.list) do
-    levels.setup(level)
+level_class={
+  cx1=nil,cy1=nil,cx2=nil,cy2=nil,
+  index=nil,
+  timer_enabled=false,
+  num_bees=0,
+  desc="",
+  new=function(o)
+    local level=setmetatable(o or {}, {__index=level_class})
+    level:setup()
+    return level
   end
+}
 
-  levels.index=1
-	levels.current=levels.list[1]
-end -- levels:init
-
-function levels.setup(lvl)
-  local cx1,cy1=lvl.cx1,lvl.cy1
+function level_class:setup()
+  local cx1,cy1=self.cx1,self.cy1
   -- initialize the level object
   -- with initial coordinates
   -- from the top-left block
   -- x/y = pixel coords
   -- cx/cy = map cell coords
-  lvl.sx1=cx1*8
-  lvl.sy1=cy1*8
+  self.sx1=cx1*8
+  self.sy1=cy1*8
 
-  lvl.plantable=0
-  lvl.planted=0
-  lvl.percent_complete=0
+  self.plantable=0
+  self.planted=0
+  self.percent_complete=0
+  self.obstacles={}
 
   -- determine level bounds
   -- set the pixel bounds in x/y
   -- and cell bounds as cx/cy
   for cx2=cx1,127 do
     if mget(cx2,cy1)==9 then
-      lvl.cx2=cx2
-      lvl.sx2=cx2*8+8
+      self.cx2=cx2
+      self.sx2=cx2*8+8
       break
     end
   end
 
   for cy2=cy1,63 do
     if mget(cx1,cy2)==7 then
-      lvl.cy2=cy2
-      lvl.sy2=cy2*8+8
+      self.cy2=cy2
+      self.sy2=cy2*8+8
       break
     end
   end
 
-  for cy=cy1,lvl.cy2 do
-    for cx=cx1,lvl.cx2 do
+  -- map all plantable tiles, obstacles, and door
+  for cy=cy1,self.cy2 do
+    for cx=cx1,self.cx2 do
       -- check for plantable tiles and set the level's plantable count
-
       if is_plantable(cx,cy) then
-        lvl.plantable+=1
+        self.plantable+=1
       end
 
-      -- if door found, set level's door location
+      -- map obstacles
       local tile=mget(cx,cy)
-      if tile==35 or tile==36 then
-        lvl.door_cx=cx
-        lvl.door_cy=cy
-        lvl.door_sx=cx*8
-        lvl.door_sy=cy*8
-        lvl.dooropen=tile==36
+      if is_wall(tile) or is_spike(tile) then
+        self.obstacles[cy]=self.obstacles[cy] or {}
+        self.obstacles[cy][cx]=true
+      end
+
+      -- find the door and set location
+      if tile==35 then
+        self.door_cx=cx
+        self.door_cy=cy
+        self.door_sx=cx*8
+        self.door_sy=cy*8
       end
     end
   end
 
-  levels.set_spawn(lvl)
 end
 
-function levels.set_spawn(lvl)
+function level_class:set_spawn()
 	-- find start sprite (#64) and
 	-- set initial x/y position
-	for i=lvl.cx1,lvl.cx2 do
-		for j=lvl.cy1,lvl.cy2 do
+	for i=self.cx1,self.cx2 do
+		for j=self.cy1,self.cy2 do
 			if mget(i,j)==64 then
-				lvl.spawnx=i*8+3
-				lvl.spawny=j*8
+				self.spawnx=i*8+3
+				self.spawny=j*8
 				mset(i,j,0)
 				break
 			end
 		end
-		if lvl.spawnx then break end
+		if self.spawnx then break end
 	end
 end
 
-function levels:update()
-	local c=self.current
-
-  if not c.dooropen and not c.exited and c.planted>=c.plantable then
-    self:open_door()
-  end
-end
-
-function levels:draw()
-  local c=self.current
-
-  -- if exited, only draw the door at its screen location
-  if c.exited then
-    map(c.door_cx,c.door_cy,c.door_sx,c.door_sy,1,1)
-  else
-  -- otherwise, draw the whole current level
-    map(c.cx1,c.cy1, -- cell coords of level origin
-        c.sx1,c.sy1, -- screen coords of level origin
-        c.cx2-c.cx1+1,
-        c.cy2-c.cy1+1)
-  end
-
-  -- draw plant remainder above a locked exit
-  if not c.dooropen then
-    print(c.plantable-c.planted,c.door_sx+1,c.door_sy-6,7)
-  end
-end
-
-function levels:open_door()
-    self.current.dooropen=true
+function level_class:open_door()
+    self.dooropen=true
     sfx(0)
-    mset(self.current.door_cx,self.current.door_cy,36)
+    mset(self.door_cx,self.door_cy,36)
     add(deferred_draws,self:make_door_anim())
 end
 
-function levels:make_door_anim(x,y)
-  local door_cx,door_cy=self.current.door_cx,self.current.door_cy
-  local x,y=door_cx*8+5,door_cy*8+2
+function level_class:make_door_anim(x,y)
+  local x,y=self.door_cx*8+5,self.door_cy*8+2
   local frame=0
 
   return function()
 		frame=(frame+1/16)%5
-		mset(door_cx,door_cy,36+frame)
+		mset(self.door_cx,self.door_cy,36+frame)
 
     local t=time()
     local rays=16
@@ -386,6 +332,61 @@ function levels:make_door_anim(x,y)
         y+dmod*distance*sin(tmod),
         10)
     end
+  end
+end
+
+
+levels={ list={} }
+
+-- find each level block, add
+-- it to the list with coords
+function levels:init()
+  -- reload map data from cartridge
+  reload(0x2000, 0x2000, 0x1000)
+
+  -- level list --
+  levels.list={
+    level_class.new({
+      index=1,
+      cx1=0,cy1=0,
+      num_bees=5,
+      desc="welcome to the dungeon"
+    }),
+    level_class.new({
+      index=2,
+      cx1=16,cy1=0,
+      num_bees=1,
+      desc="plant some flowers!"
+    }),
+    level_class.new({
+      index=3,
+      cx1=94,cy1=28,
+      num_bees=4,
+    })
+  }
+
+  levels.index=1
+	levels.current=levels.list[1]
+end -- levels:init
+
+
+function levels:draw()
+  local c=self.current
+
+  -- if exited, only draw the door at its screen location
+  if c.exited then
+    map(c.door_cx,c.door_cy,c.door_sx,c.door_sy,1,1)
+  else
+  -- otherwise, draw the whole current level
+    map(c.cx1,c.cy1, -- cell coords of level origin
+        c.sx1,c.sy1, -- screen coords of level origin
+        c.cx2-c.cx1+1,
+        c.cy2-c.cy1+1)
+  end
+
+  -- draw plant remainder above a locked exit
+  if not c.dooropen then
+    print(c.plantable-c.planted,c.door_sx+1,c.door_sy-6,7)
   end
 end
 
