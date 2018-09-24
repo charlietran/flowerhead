@@ -2328,15 +2328,19 @@ game_mode.debug_menu.sel=1
 game_mode.debug_menu.items={}
 
 toggles={
-  performace=false,
+  performance=false,
   path_vis=false,
 	a_star=true,
 	bee_move=true,
 }
 
 function game_mode.debug_menu:update()
-  if btnp(2) then self.sel-=1 end
-  if btnp(3) then self.sel+=1 end
+  if btnp(2) then
+    self.sel=self.sel==1 and #self.items or self.sel-1
+  end
+  if btnp(3) then
+    self.sel=self.sel==#self.items and 1 or self.sel+1
+  end
   self.sel=mid(self.sel,1,#self.items)
   if btnp(4) then self.items[self.sel][2]() end
   if btnp(4,1) then current_game_mode=game_mode.game end
@@ -2347,7 +2351,9 @@ function game_mode.debug_menu:update()
   self:make_toggle("a_star")
   add(self.items,{
     "spawn bee ("..#bees.list..")", function()
-      bees:add(levels.current.sx1+12,levels.current.sy1+12)
+      add(bees.list,
+        bee_class:new({x=levels.current.sx1+12,y=levels.current.sy1+12})
+      )
     end
   })
   self:make_toggle("bee_move")
@@ -2355,7 +2361,7 @@ function game_mode.debug_menu:update()
     "skip to next level", function() levels:goto_next() end
   })
   add(self.items,{
-    "open current door", function() levels:open_door() end
+    "open current door", function() levels.current:open_door() end
   })
   add(self.items,{
     "return to game", function() current_game_mode=game_mode.game end
