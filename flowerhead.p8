@@ -72,10 +72,11 @@ end
 function game_mode.game:update()
   gametime+=1
   cam:update()
-  player:update()
-  bees:update()
+
+  -- entities include player, bees, bombs
+  for _,e in pairs(entities) do e:update() end
+
   specks:update()
-  bombs:update()
   explosions:update()
 end
 
@@ -87,10 +88,9 @@ function game_mode.game:draw()
   levels:draw()
   tutorials:draw()
   grasses:draw()
-  bees:draw()
-  player:draw()
+  -- entities include player, bees, bombs
+  for _,e in pairs(entities) do e:draw() end
   specks:draw()
-  bombs:draw()
   explosions:draw()
   banners:draw()
   cam:fade()
@@ -122,8 +122,8 @@ function reset_level()
     levels.current.percent_complete=0
     levels.current.planted=0
   else
+    remove_entities("bomb")
     truncate(grasses.map)
-    truncate(bombs.list)
     truncate(specks.list)
     truncate(explosions.list)
   end
@@ -411,7 +411,7 @@ function levels:goto_next()
   end
 
   current_game_mode=game_mode.game
-  truncate(bees.list)
+  remove_entities("bee")
   reset_level()
 end
 
@@ -497,8 +497,7 @@ function banners:add(level)
     clouds:draw()
     cam:draw()
     levels:draw()
-    player:draw()
-    bees:draw()
+    for _,e in pairs(entities) do e:draw() end
     draw_box(self.box1)
     draw_box(self.box2)
   end
@@ -618,6 +617,14 @@ function banners:add(level)
       -- flip drawing on the x axis if self.flipx is true
       self.flipx
       )
+  end
+
+  function remove_entities(name)
+    for e in all(entities) do
+      if e.name==name then
+        del(entities,e)
+      end
+    end
   end
 
   --------------------------------
@@ -859,8 +866,13 @@ function banners:add(level)
       local bomb_vy = -self.bomb_input_timer*0.4
       local bomb_vx = self.facing*self.bomb_input_timer*0.2 + self.vx*0.6
       self.is_bombing=true
-      bombs:add(self.x,self.y-1,bomb_vx,bomb_vy)
       self.throwtimer=7
+      bomb_class:new({
+        x=self.x,
+        y=self.y-1,
+        vy=bomb_vy,
+        vx=bomb_vx
+      })
     end
   end -- player.bomb_input
 
@@ -1417,6 +1429,10 @@ function banners:add(level)
     return setmetatable(entity_class:new(obj or {}), {__index=bomb_class})
   end
 
+  function bomb_class:update()
+    self:move()
+  end
+
   function bomb_class:m_collide_callback(collision)
     -- when a bomb x-collides with wall, bounce back
     if collision.axis=='x' then
@@ -1448,21 +1464,20 @@ function banners:add(level)
   function bomb_class:dud()
     explosions.add(self.x,self.y+2,2)
     sfx(41,3,1)
-    del(bombs.list,self)
     self:die()
   end
 
   function bomb_class:explode()
     explosions.add(self.x,self.y,4)
     local prev_planted=levels.current.planted
-    for i=self.x+bombs.plant_radius,self.x-bombs.plant_radius,-1 do
+    -- plant 9 bombs around the explosion point
+    for i=self.x+5,self.x-5,-1 do
       grasses.plant(i,self.y)
     end
     laff(self.x,self.y)
     sfx(40,-1)
     sfx(41,-1)
     cam:shake(6,1)
-    del(bombs.list,self)
     self:die()
   end
 
@@ -1473,23 +1488,6 @@ function banners:add(level)
         props={x=x,y=y-10},duration=60,
         draw=function() print(laff.t,laff.x+cos(t()),laff.y,laff.col) end
       })
-  end
-
-  bombs={
-    plant_radius=5,
-    list={}
-  }
-
-  function bombs:draw()
-    for _,bomb in pairs(self.list) do bomb:animate() end
-  end
-
-  function bombs.update(b)
-    for _,bomb in pairs(b.list) do bomb:move() end
-  end -- bombs.update()
-
-  function bombs:add(x,y,vx,vy)
-    add(self.list,bomb_class:new({x=x,y=y,vy=vy,vx=vx}))
   end
 
   explosions={}
@@ -1821,9 +1819,6 @@ function banners:add(level)
   end
 
   function bee_class:die()
-    self.dead=true
-    del(bees.list,self)
-    del(entities,self)
     for i=1,64 do
       spawnp(
         self.x,
@@ -1836,6 +1831,7 @@ function banners:add(level)
         )
       sfx(42)
     end
+    entity_class.die(self)
   end
 
   -- Debugging visualization to draw the pathfinding
@@ -1875,18 +1871,7 @@ function banners:add(level)
     -- how many frames to delay after spawning for
     -- bees to start pathfinding the player
     spawn_pathfinding_delay=60,
-    list={}
   }
-
-  function bees:update()
-    for _,bee in pairs(bees.list) do bee:update() end
-  end
-
-  function bees:draw()
-    for _,bee in pairs(self.list) do
-      bee:draw()
-    end
-  end
 
   function bees:spawn(cx,cy)
     printh('spawning bee')
@@ -1912,7 +1897,7 @@ function banners:add(level)
         -- make a spawn effect centered above the tile
         bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
         -- add our new bee to the bee list
-        function() add(bees.list,bee) end,
+        function() add(entities,bee) end,
         -- animate the bee zooming from its initial big size down to normal
         make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},duration=30}),
         -- after our specified delay, then enable pathfinding
@@ -1935,14 +1920,16 @@ function banners:add(level)
 
     -- Retarget all bees back towards the door
     function bees:recall()
-      for _,bee in pairs(self.list) do
-        bee.pathfinder.enabled=false
-        bee.target_x=levels.current.door_sx
-        bee.target_y=levels.current.door_sy
-        add(coroutines,coroutine_sequence({
-              make_delay(240),
-              function() bee.pathfinder.enabled=true end
+      for _,e in pairs(entities) do
+          if e.is_bee then
+          e.pathfinder.enabled=false
+          e.target_x=levels.current.door_sx
+          e.target_y=levels.current.door_sy
+          add(coroutines,coroutine_sequence({
+            make_delay(240),
+            function() e.pathfinder.enabled=true end
           }))
+        end
       end
     end
 
@@ -2418,8 +2405,8 @@ function banners:add(level)
       self:make_toggle("path_vis")
       self:make_toggle("a_star")
       add(self.items,{
-          "spawn bee ("..#bees.list..")", function()
-            add(bees.list,
+          "spawn bee", function()
+            add(entities,
               bee_class:new({x=levels.current.sx1+12,y=levels.current.sy1+12})
               )
           end
