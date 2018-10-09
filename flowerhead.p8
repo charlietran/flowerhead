@@ -94,14 +94,6 @@ function game_mode.game:draw()
   cam:fade()
 end
 
-function round(num, numdecimalplaces)
-  if numdecimalplaces and numdecimalplaces>0 then
-    local mult = 10^numdecimalplaces
-    return flr(num * mult + 0.5) / mult
-  end
-  return flr(num + 0.5)
-end
-
 clouds={
   speed=0.1,
   padding=40,
@@ -1942,7 +1934,7 @@ function game_mode.outro:draw()
   music(-1,50)
   camera(0,0)
   print("you planted all the flowers!!", 16, 54, 7)
-  print("your time: "..round(gametime/60,2).." seconds", 24, 62, 7)
+  print("your time: "..(gametime/60).." seconds", 24, 62, 7)
   print("press z to restart", 32, 70, 7)
 end
 
