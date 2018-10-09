@@ -152,7 +152,7 @@ function clouds:draw()
   -- draw the clouds as circles
   -- drifting in the x direction
   -- over time and with parallax
-  local t=time()
+  local tm=time()
   for _,cloud in pairs(self.list) do
     local cloudx,cloudy
     -- the y offset is the
@@ -170,7 +170,7 @@ function clouds:draw()
     -- so that the clouds appear
     -- to drift to the left
 
-    local xdrift  = 0.1*cam.x+t
+    local xdrift  = 0.1*cam.x+tm
     local xoffset = cloud.x-xdrift*cloud.size*clouds.speed
     local xrange  = 128+clouds.padding+2*cloud.size
 
@@ -190,13 +190,14 @@ level_class={
   index=nil,
   timer_enabled=false,
   num_bees=0,
-  desc="",
-  new=function(o)
-    local level=setmetatable(o or {}, {__index=level_class})
-    level:setup()
-    return level
-  end
+  desc=""
 }
+
+function level_class.new(o)
+  local level=setmetatable(o or {}, {__index=level_class})
+  level:setup()
+  return level
+end
 
 function level_class:setup()
   local cx1,cy1=self.cx1,self.cy1
@@ -431,6 +432,7 @@ end
 
 function banners:draw()
   --local ox,oy=cam.x-64,cam.y-64
+  local tm=time()
   for _,b in pairs(self.list) do
     -- adjust banner x and y for camera position
     local x=cam.x-64
@@ -447,7 +449,7 @@ function banners:draw()
       print(
         sub(b.title,i,i),
         x+margin+(width-#b.title*6)/2 + (i-1)*6,
-        y+b.height/4+sin(i/#b.title + t()/2),
+        y+b.height/4+sin(i/#b.title + tm/2),
         10)
     end
 
@@ -493,6 +495,19 @@ function game_mode.lvl_complete:draw()
   draw_box(self.box2)
 end
 
+function poof(x,y,c)
+  for i=1,64 do
+    spawnp(
+      x,
+      y,
+      cos(i/64), -- vx
+      sin(i/64), -- vy
+      1, -- jitter
+      c, -- color
+      .75 -- duration
+      )
+  end
+end
 --------------------------------
 --entities----------------------
 -- describes a game object that
@@ -568,14 +583,9 @@ function entity_class:check_e_collisions()
     if entity ~= self then
       if e_collide(self,entity) then
         self:e_collide_callback(entity)
-        return true
       end
     end
   end
-end
-
-function entity_class:e_collide_callback(entity)
-  printh(self.name.." collided with "..entity.name)
 end
 
 function entity_class:draw()
@@ -587,7 +597,7 @@ function entity_class:animate()
 
   self.anim.timer = (self.anim.timer+self.anim.speed) % self.anim.frames
 
-  -- Draw the entity's sprite from the sprite sheet
+  -- draw the entity's sprite from the sprite sheet
   sspr(
     -- the sprite's location on the sheet is based on the spr_x and spr_y attributes
     -- spr_x is multiplied by the anim timer because animation frames are
@@ -1474,11 +1484,24 @@ end
 
 laffs={"woo","haa","hoo","hee","hii","yaa"}
 function laff(x,y)
-  local laff={x=x,y=y,t=laffs[ceil(rnd(6))],col=3+8*flr(rnd(2))}
+  local laff={
+    x=x,
+    y=y,
+    text=laffs[1+flr(rnd(6))],
+    col=3+8*flr(rnd(2)),
+  }
   deferred_animate(laff,{
-      props={x=x,y=y-10},duration=60,
-      draw=function() print(laff.t,laff.x+cos(t()),laff.y,laff.col) end
-    })
+    props={x=x,y=y-10},
+    duration=60,
+    draw=function()
+      print(
+        laff.text,
+        laff.x+cos(time()),
+        laff.y,
+        laff.col
+      )
+    end
+  })
 end
 
 explosions={}
@@ -1577,15 +1600,13 @@ function game_mode.intro:draw()
   clouds:draw()
   specks:draw()
 
-  local time=t()
-
   self.animtimer+=0.25
   if self.animtimer>self.animlength then
     self.animtimer=1
   end
 
   for i=1,#self.title do
-    y=sin(i/16+time/8)*4
+    y=sin(i/16+time()/8)*4
     print(
       sub(self.title,i,i),
       64 - #self.title*4  + ((i-1)*8),
@@ -1740,8 +1761,7 @@ function bee_class:new(obj)
 end
 
 function bee_class:jitter()
-  local time=t()
-  local offset=sin(time)*0.3
+  local offset=sin(time())*0.3
   self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
 
@@ -1810,22 +1830,12 @@ function bee_class:e_collide_callback(entity)
 end
 
 function bee_class:die()
-  for i=1,64 do
-    spawnp(
-      self.x,
-      self.y,
-      cos(i/64), -- vx
-      sin(i/64), -- vy
-      1, -- jitter
-      9, -- color
-      .75 -- duration
-      )
-    sfx(42)
-  end
+  poof(self.x,self.y,9)
   entity_class.die(self)
+  sfx(42)
 end
 
--- Debugging visualization to draw the pathfinding
+-- debugging visualization to draw the pathfinding
 -- for each bee
 function bee_class:draw_paths()
   local pf=self.pathfinder
@@ -1867,22 +1877,21 @@ bees={
 function bees:spawn(cx,cy)
   printh('spawning bee')
 
-  local bee=bee_class:new()
-
   -- the bee randomly flies in from left or right
   local dir=sgn(-1+rnd(2))
-  bee.flipx=-dir
+  local bee=bee_class:new({
+      flipx=-dir,
+      -- spawn the bee centered above the passed-in cell coordinate
+      x=cx*8+bee_class.wr+dir*32,
+      y=cy*8-32,
+      -- bee starts big then zooms down to normal size
+      scale=8,
+      spawning=true,
+      target_x=cx*8+bee_class.wr+1,
+      target_y=cy*8-8+bee_class.hr,
+  })
 
-  -- spawn the bee centered above the passed-in cell coordinate
-  bee.x,bee.y=cx*8+bee.wr+dir*32,cy*8-32
-
-  -- bee starts big then zooms down to normal size
-  bee.scale=8
-
-  --
   bee.pathfinder.enabled=false
-  bee.spawning=true
-  bee.target_x,bee.target_y=cx*8+bee.wr+1,cy*8-8+bee.hr
 
   local seq=coroutine_sequence({
     -- make a spawn effect centered above the tile
@@ -1968,7 +1977,6 @@ function pathfinder_class:update(target_entity)
   self.visited={}
 
   self.search_bound=manhattan_distance(start_cell,self.goal_cell)
-  printh("search bound:"..self.search_bound)
 
   local path_cell = self:search_frontier()
   self.path={path_cell,self.goal_cell}
@@ -2041,15 +2049,12 @@ end
 pathfinder_class.costs={}
 
 function pathfinder_class:search_frontier()
-  start_measure("search frontier")
   local search_depth=0
   while #self.frontier>0 do
     -- grab the first item in priority queue (frontier)
     local current=pop_end(self.frontier)
     -- stop searching once goal is found
     if current.index==self.goal_index then
-      stop_measure("search frontier")
-      printh(search_depth)
       return current.cell
     end
 
@@ -2388,16 +2393,6 @@ function game_mode.debug_menu:make_toggle(name)
       name..": "..(toggles[name] and "enabled" or "disabled"),
       function() toggles[name] = not toggles[name] end
     })
-end
-
-measures={}
-function start_measure(name)
-  measures[name]=stat(1)
-end
-
-function stop_measure(name)
-  printh(name..": "..((stat(1)-measures[name])*100).."%")
-  del(measures,measures[name])
 end
 
 __gfx__
