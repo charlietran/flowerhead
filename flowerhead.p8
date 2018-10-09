@@ -116,6 +116,10 @@ function reset_level()
   end
 
   grasses.map={}
+  grasses.tiles={}
+  for _,t in pairs(lvl.changed_tiles) do
+    mset(t[1],t[2],t[3])
+  end
   lvl.percent_complete=0
   lvl.planted=0
   remove_entities("bomb")
@@ -195,6 +199,7 @@ level_class={
   index=nil,
   timer_enabled=false,
   num_bees=0,
+  changed_tiles={},
   desc=""
 }
 
@@ -1472,6 +1477,7 @@ function grasses.update_tile(cx,cy)
     -- to the right
     ot=mget(cx,cy)
     mset(cx,cy,ot+9)
+    add(lvl.changed_tiles,{cx,cy,ot})
 
     -- spawn a bee if necessary
     if lvl.bee_index[lvl.planted] then
