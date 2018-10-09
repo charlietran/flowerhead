@@ -42,7 +42,6 @@ function _init()
   clouds:init()
   cam:init()
   levels:init()
-  tutorials:init()
   player:init()
 end
 
@@ -86,7 +85,6 @@ function game_mode.game:draw()
   clouds:draw()
   cam:draw()
   levels:draw()
-  tutorials:draw()
   grasses:draw()
   -- entities include player, bees, bombs
   for _,e in pairs(entities) do e:draw() end
@@ -1931,55 +1929,6 @@ function bees:recall()
         make_delay(240),
         function() e.pathfinder.enabled=true end
       }))
-    end
-  end
-end
-
---tutorials---------------------
---------------------------------
--- in game tutorial text
--- the index is the sprite num
-tutorials={list={}}
-
-tutorials.list[113]={
-  lines={
-    {c=7,t="⬅️➡️⬆️⬇️: move"},
-    {c=7,t="z:jump/walljump"},
-  }
-}
-
-tutorials.list[114]={
-  lines={
-    {c=7,t="fill the dungeon with"},
-    {c=7,t="flowers to unlock exit"},
-    {c=7,t=""},
-    {c=7,t="x:throw flower bomb"},
-  }
-}
-
-function tutorials:init()
-  for i=0,127 do
-    for j=0,63 do
-      local spr_num=mget(i,j)
-      if self.list[spr_num] then
-        self.list[spr_num].x=i*8+1
-        self.list[spr_num].y=j*8
-        mset(i,j,0)
-      end
-    end
-  end
-end
-
-function tutorials:draw()
-  for _,tut in pairs(self.list) do
-    if tut.x then
-      for i,line in pairs(tut.lines) do
-        print(
-          line.t,
-          tut.x,
-          tut.y + i*7,
-          line.c or 7)
-      end
     end
   end
 end
