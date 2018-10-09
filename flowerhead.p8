@@ -2061,65 +2061,6 @@ function pathfinder_class:update(target_entity)
   end
 end
 
-function pathfinder_class:map_costs()
-  self.costs={}
-  self.adjusted={}
-
-  -- init cost value for all movable tiles
-  for cy=lvl.cy1,lvl.cy2 do
-    self.costs[cy]=self.costs[cy] or {}
-    self.adjusted[cy]=self.adjusted[cy] or {}
-    for cx=lvl.cx1,lvl.cx2 do
-      self.costs[cy][cx]=lvl.obstacles[cy][cx] and 'x' or (lvl.cx2-lvl.cx1)+(lvl.cy2-lvl.cy1)
-    end
-  end
-
-  -- set goal spaces
-  local goals={
-    pos_to_cell(player.x+player.wr,player.y+player.hr)
-  }
-
-  -- scan and adjust costs
-  self:adjust_costs(goals)
-end
-
-function pathfinder_class:adjust_costs(goals)
-  local cx1,cx2,cy1,cy2=lvl.cx1,lvl.cx2,lvl.cy1,lvl.cy2
-
-  for goal_cell in all(goals) do
-    self.costs[goal_cell[2]][goal_cell[1]]=0
-    local frontier={goal_cell}
-    local checked={}
-    while #frontier > 0 do
-      local current=pop_end(frontier)
-      local cx,cy=current[1],current[2]
-      local current_value=self.costs[cy][cx]
-      local neighbor_checks={ {cx,cy-1}, {cx,cy+1}, {cx-1,cy}, {cx+1,cy}, }
-      for _,check in pairs(neighbor_checks) do
-        local n_cx,n_cy=check[1],check[2]
-        local n_index=cell_to_index({n_cx,n_cy})
-        local n_value=self.costs[n_cy][n_cx]
-        if n_cx>cx1 and n_cx<cx2 and n_cy>cy1 and n_cy<cy2 and
-          n_value~='x' then
-          if self.costs[n_cy][n_cx] > current_value+1 then
-            self.costs[n_cy][n_cx]=current_value+1
-          end
-          if not checked[n_index] then
-            add(frontier,{n_cx,n_cy})
-          end
-        end
-      end
-      checked[cell_to_index({cx,cy})]=true
-    end
-  end
-end
-
-function pathfinder_class:clear_costs()
-  truncate(pathfinder_class.costs)
-end
-
-pathfinder_class.costs={}
-
 function pathfinder_class:search_frontier()
   local search_depth=0
   while #self.frontier>0 do
