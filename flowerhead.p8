@@ -103,20 +103,23 @@ clouds.list={}
 function reset_level()
   player:init()
   cam.fadeout=1
-  gametime=0
 
-  if not levels.current.started then
-    levels.current.started=true
-    banners:add(levels.current)
-    grasses.map={}
-    levels.current.percent_complete=0
-    levels.current.planted=0
-  else
-    remove_entities("bomb")
-    truncate(grasses.map)
-    truncate(specks.list)
-    truncate(explosions.list)
+  if lvl.start_opened then
+    lvl:open_door(false)
   end
+
+  if not lvl.started then
+    lvl.started=true
+    banners:add(lvl)
+  end
+
+  grasses.map={}
+  lvl.percent_complete=0
+  lvl.planted=0
+  remove_entities("bomb")
+  truncate(grasses.map)
+  truncate(specks.list)
+  truncate(explosions.list)
 end
 
 function clouds:init()
@@ -286,14 +289,14 @@ function level_class:set_spawn()
   end
 end
 
-function level_class:open_door()
+function level_class:open_door(with_rays)
   self.dooropen=true
-  sfx(0)
+  if with_rays then sfx(0) end
   mset(self.door_cx,self.door_cy,36)
-  add(deferred_draws,self:make_door_anim())
+  add(deferred_draws,self:make_door_anim(with_rays))
 end
 
-function level_class:make_door_anim(x,y)
+function level_class:make_door_anim(with_rays)
   local x,y=self.door_cx*8+5,self.door_cy*8+2
   local frame=0
 
@@ -301,6 +304,7 @@ function level_class:make_door_anim(x,y)
     frame=(frame+1/16)%5
     mset(self.door_cx,self.door_cy,36+frame)
 
+    if not with_rays then return end
     local t=time()
     local rays=16
     local dx,dy=player.x-x,player.y-y
@@ -351,58 +355,67 @@ function levels:init()
     level_class.new({
         index=1,
         cx1=0,cy1=0,
-        num_bees=5,
-        desc="welcome to the dungeon"
+        num_bees=0,
+        desc="welcome to the dungeon",
+        bombs_disabled=true
       }),
     level_class.new({
         index=2,
         cx1=16,cy1=0,
         num_bees=1,
-        desc="plant some flowers!"
+        desc="mmm spikey",
+        bombs_disabled=true
       }),
     level_class.new({
         index=3,
+        cx1=32,cy1=0,
+        num_bees=0,
+        desc="the door is locked?",
+        bombs_disabled=true
+      }),
+    level_class.new({
+        index=4,
         cx1=94,cy1=28,
         num_bees=4,
       })
   }
 
   levels.index=1
-  levels.current=levels.list[1]
+  lvl=levels.list[1]
 end -- levels:init
 
 
 function levels:draw()
-  local c=self.current
-
   -- if exited, only draw the door at its screen location
-  if c.exited then
-    map(c.door_cx,c.door_cy,c.door_sx,c.door_sy,1,1)
+  if lvl.exited then
+    map(lvl.door_cx,lvl.door_cy,lvl.door_sx,lvl.door_sy,1,1)
   else
     -- otherwise, draw the whole current level
-    map(c.cx1,c.cy1, -- cell coords of level origin
-      c.sx1,c.sy1, -- screen coords of level origin
-      c.cx2-c.cx1+1,
-      c.cy2-c.cy1+1)
+    map(lvl.cx1,lvl.cy1, -- cell coords of level origin
+      lvl.sx1,lvl.sy1, -- screen coords of level origin
+      lvl.cx2-lvl.cx1+1,
+      lvl.cy2-lvl.cy1+1)
   end
 
   -- draw plant remainder above a locked exit
-  if not c.dooropen then
-    print(c.plantable-c.planted,c.door_sx+1,c.door_sy-6,7)
+  if not lvl.dooropen then
+    local rem=""..(lvl.plantable-lvl.planted)
+    print(rem,lvl.door_sx+(8-#rem*4)/2,lvl.door_sy-6,4)
   end
 end
 
 function levels:goto_next()
   self.index+=1
-  self.current=self.list[self.index]
+  lvl=self.list[self.index]
 
-  if not self.current then
+  if not lvl then
     current_game_mode=game_mode.outro
     return
   end
 
   current_game_mode=game_mode.game
   remove_entities("bee")
+  truncate(deferred_draws)
   reset_level()
 end
 
@@ -464,26 +477,18 @@ end
 function game_mode.lvl_complete:start()
   -- change game mode and exit the level
   current_game_mode=game_mode.lvl_complete
-  levels.current.exited=true
+  lvl.exited=true
   player.vx=0
   music(10)
 
-  self.box1={x=cam.x-64,y=cam.y-64-127,w=127,h=127,color=1}
-  self.box2={x=cam.x-64,y=cam.y+64,w=127,h=127,color=1}
-  deferred_animate(self.box1,{props={x=cam.x-64,y=player.y-15-127},duration=30})
-  deferred_animate(self.box2,{props={x=cam.x-64,y=player.y+15},duration=30})
-  add(coroutines,coroutine_sequence({
-        make_delay(120),
+  cinematic(false,120,
         function()
           music(0)
-          truncate(deferred_draws)
           levels:goto_next()
-        end
-    }))
+        end)
 end
 
-function game_mode.lvl_complete:update()
-end
+function game_mode.lvl_complete:update() end
 
 function game_mode.lvl_complete:draw()
   cls()
@@ -491,8 +496,33 @@ function game_mode.lvl_complete:draw()
   cam:draw()
   levels:draw()
   for _,e in pairs(entities) do e:draw() end
-  draw_box(self.box1)
-  draw_box(self.box2)
+end
+
+--------------------------------
+--visual effects----------------
+function cinematic(lines,hold,callback,color)
+  local color=color or 1
+  local box1={
+    x=cam.x-64,y=cam.y-64-127,w=127,h=127,color=color,
+    params={props={x=cam.x-64,y=player.y-15-127},duration=30,hold=hold-30},
+  }
+  box1.params.draw=function() draw_box(box1) end
+  local box2={
+    x=cam.x-64,y=cam.y+64,w=127,h=127,color=color,
+    params={props={x=cam.x-64,y=player.y+15},duration=30,hold=hold-30},
+  }
+  box2.params.draw=function() draw_box(box2) end
+  deferred_animate(box1,box1.params)
+  deferred_animate(box2,box2.params)
+  if lines then
+    local t={x=box2.x,y=box2.y}
+    deferred_animate(t,
+      {
+        props={x=t.x,y=box2.params.props.y+6},duration=30,hold=hold-30,
+        draw=function() for i,l in pairs(lines) do print(l,t.x+(64-#l*2),t.y+8*(i-1),7) end end
+      })
+  end
+  add(coroutines,coroutine_sequence({ make_delay(hold), callback }))
 end
 
 function poof(x,y,c)
@@ -830,7 +860,9 @@ function player:handleinput()
     self:air_input()
   end
   self:jump_input()
-  self:bomb_input()
+  if not lvl.bombs_disabled then
+    self:bomb_input()
+  end
 
   -- press lshift or tab for debug menu
   if btnp(4,1) then
@@ -1224,7 +1256,7 @@ function m_collide(entity,axis,distance,nearonly)
 
   -- start the exit timer when player touches door
   local player_exiting = entity.is_player
-  and not levels.current.exited
+  and not lvl.exited
   and (is_open_exit(tile1) or is_open_exit(tile2))
   if player_exiting then player.exit_timer+=1 end
 
@@ -1388,9 +1420,8 @@ function grasses.update_tile(cx,cy)
   -- if a tile has at least 6 (out of 8) grasses planted,
   -- mark it as fully planted
   if grasses.tiles[cy][cx]>=6 then
-    local c=levels.current
     grasses.tiles[cy][cx]=8
-    c.planted+=1
+    lvl.planted+=1
 
     -- draw the tile differently now that it is planted
     -- the sprite sheet is arbitrarily set up so that
@@ -1400,15 +1431,15 @@ function grasses.update_tile(cx,cy)
     mset(cx,cy,ot+9)
 
     -- spawn a bee if necessary
-    if c.bee_index[c.planted] then
+    if lvl.bee_index[lvl.planted] then
       bees:spawn(cx,cy)
       -- flag that the bee has been spawned
-      c.bee_index[c.planted]=false
+      lvl.bee_index[lvl.planted]=false
     end
 
     -- open the door if possible
-    if not c.dooropen and not c.exited and c.planted>=c.plantable then
-      c:open_door()
+    if not lvl.dooropen and not lvl.exited and lvl.planted>=lvl.plantable then
+      lvl:open_door(true)
     end
   end
 end
@@ -1448,8 +1479,7 @@ function bomb_class:m_collide_callback(collision)
         self:explode()
       end
     else
-      -- if we collided moving upward, we hit the ceiling
-      -- then fall back down
+      -- if we collided moving upward, we hit the roof then fall back down
       self.vy=0
     end
   end
@@ -1470,7 +1500,6 @@ end
 
 function bomb_class:explode()
   explosions.add(self.x,self.y,4)
-  local prev_planted=levels.current.planted
   -- plant 9 bombs around the explosion point
   for i=self.x+5,self.x-5,-1 do
     grasses.plant(i,self.y)
@@ -1694,8 +1723,8 @@ function cam:update()
   -- clamp the camera offset to
   -- be within the bounds of our
   -- current.level
-  self.x=mid(self.x,levels.current.sx1+64,levels.current.sx2-64)
-  self.y=mid(self.y,levels.current.sy1+64,levels.current.sy2-64)
+  self.x=mid(self.x,lvl.sx1+64,lvl.sx2-64)
+  self.y=mid(self.y,lvl.sy1+64,lvl.sy2-64)
 end
 
 -- returns coordinates to be
@@ -1919,13 +1948,13 @@ function bees:make_spawn_effect(x,y,vx,vy,duration)
   end
 end
 
--- Retarget all bees back towards the door
+-- retarget all bees back towards the door
 function bees:recall()
   for _,e in pairs(entities) do
       if e.is_bee then
       e.pathfinder.enabled=false
-      e.target_x=levels.current.door_sx
-      e.target_y=levels.current.door_sy
+      e.target_x=lvl.door_sx
+      e.target_y=lvl.door_sy
       add(coroutines,coroutine_sequence({
         make_delay(240),
         function() e.pathfinder.enabled=true end
@@ -1994,11 +2023,11 @@ function pathfinder_class:map_costs()
   self.adjusted={}
 
   -- init cost value for all movable tiles
-  for cy=levels.current.cy1,levels.current.cy2 do
+  for cy=lvl.cy1,lvl.cy2 do
     self.costs[cy]=self.costs[cy] or {}
     self.adjusted[cy]=self.adjusted[cy] or {}
-    for cx=levels.current.cx1,levels.current.cx2 do
-      self.costs[cy][cx]=levels.current.obstacles[cy][cx] and 'x' or (levels.current.cx2-levels.current.cx1)+(levels.current.cy2-levels.current.cy1)
+    for cx=lvl.cx1,lvl.cx2 do
+      self.costs[cy][cx]=lvl.obstacles[cy][cx] and 'x' or (lvl.cx2-lvl.cx1)+(lvl.cy2-lvl.cy1)
     end
   end
 
@@ -2012,7 +2041,7 @@ function pathfinder_class:map_costs()
 end
 
 function pathfinder_class:adjust_costs(goals)
-  local cx1,cx2,cy1,cy2=levels.current.cx1,levels.current.cx2,levels.current.cy1,levels.current.cy2
+  local cx1,cx2,cy1,cy2=lvl.cx1,lvl.cx2,lvl.cy1,lvl.cy2
 
   for goal_cell in all(goals) do
     self.costs[goal_cell[2]][goal_cell[1]]=0
@@ -2068,7 +2097,6 @@ end
 
 function pathfinder_class.get_neighbor_cells(cell)
   local neighbors={}
-  local lvl=levels.current
   local x,y=cell[1],cell[2]
 
   local possible_neighbors={
@@ -2287,12 +2315,8 @@ function make_animation(obj,params)
   end
 end
 
-function make_delay(duration)
-  return function()
-    for i=1,duration do
-      yield()
-    end
-  end
+function make_delay(dur)
+  return function() for i=1,dur do yield() end end
 end
 
 function coroutine_sequence(fns)
@@ -2331,8 +2355,6 @@ game_mode.debug_menu.sel=1
 game_mode.debug_menu.items={}
 
 toggles={
-  performance=false,
-  path_vis=false,
   a_star=true,
   bee_move=true,
 }
@@ -2349,22 +2371,22 @@ function game_mode.debug_menu:update()
   if btnp(4,1) then current_game_mode=game_mode.game end
 
   self.items={}
-  self:make_toggle("performance")
-  self:make_toggle("path_vis")
-  self:make_toggle("a_star")
+  self:make_toggle"performance"
+  self:make_toggle"path_vis"
+  self:make_toggle"a_star"
   add(self.items,{
       "spawn bee", function()
         add(entities,
-          bee_class:new({x=levels.current.sx1+12,y=levels.current.sy1+12})
+          bee_class:new({x=lvl.sx1+12,y=lvl.sy1+12})
           )
       end
     })
-  self:make_toggle("bee_move")
+  self:make_toggle"bee_move"
   add(self.items,{
       "skip to next level", function() levels:goto_next() end
     })
   add(self.items,{
-      "open current door", function() levels.current:open_door() end
+      "open current door", function() lvl:open_door(true) end
     })
   add(self.items,{
       "return to game", function() current_game_mode=game_mode.game end
