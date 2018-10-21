@@ -17,17 +17,12 @@ function _init()
 
   printh("------\n")
 
-  gravity=.2
+  gravity=.05
   friction=.88
 
   -- speed of our animation loops
-  runanimspeed=.12
+  runanimspeed=.3
   wallrunanimspeed=.2
-
-  -- delta time multiplier,
-  -- essentially controls the
-  -- speed of the game
-  dt=.5
 
   -- game length timer
   gametime=0
@@ -611,7 +606,7 @@ end
 
 function entity_class:move()
   -- move through all our x steps, then our y steps
-  local xsteps=abs(self.vx)*dt
+  local xsteps=abs(self.vx)
   local step,collision
   for i=xsteps,0,-1 do
     step=min(i,1)*sgn(self.vx)
@@ -626,10 +621,10 @@ function entity_class:move()
   end
 
   if self.has_gravity then
-    self.vy+=gravity*dt
+    self.vy+=gravity
   end
 
-  local ysteps=abs(self.vy)*dt
+  local ysteps=abs(self.vy)
   for i=ysteps,0,-1 do
     step=min(i,1)*sgn(self.vy)
     collision=self.map_collide and m_collide(self,'y',step)
@@ -779,7 +774,7 @@ function player:init()
 
     --instantaneous jump velocity
     --the "power" of the jump
-    jumpv=3,
+    jumpv=1.5,
 
     --movement states
     standing=false,
@@ -867,7 +862,7 @@ function player:draw()
       self.spr=64+self.runtimer%3
     end
   elseif self.wallsliding	then
-    self.spr=96+flr(player.runtimer%4)
+    self.spr=96+flr(self.runtimer%4)
   else
     if self.vy<0 then
       self.spr=80 -- jumping up
@@ -918,6 +913,10 @@ function player:update()
   end
 
   self.hit_spike_this_frame=false
+
+  -- each frame, reduce player x speed by 2%
+  -- prevents player from going too fast
+  self.vx*=0.98
 
   --move the player, x then y
   self:movex()
@@ -970,9 +969,6 @@ function player:handle_input()
   if btnp(5,1) then
     levels:goto_next()
   end
-
-  --overall x speed tweak to make things feel right
-  self.vx*=0.98
 end
 
 function player.jump_input(p)
@@ -997,8 +993,8 @@ function player:bomb_input()
 
   local release_bomb=self.bomb_input_timer==7 or (not bomb_pressed and self.bomb_input_timer>0)
   if not self.is_bombing and release_bomb then
-    local bomb_vy = -self.bomb_input_timer*0.4
-    local bomb_vx = self.facing*self.bomb_input_timer*0.2 + self.vx*0.6
+    local bomb_vy = -self.bomb_input_timer*0.2
+    local bomb_vx = self.facing*self.bomb_input_timer*0.1 + self.vx*0.6
     self.is_bombing=true
     self.throwtimer=7
     bomb_class:new({
@@ -1029,7 +1025,7 @@ function player:movejump()
     --set x velocity / direction
     --based on wall facing
     --(looking away from wall)
-    self.vx=self.facing*2
+    self.vx=self.facing
     self.flipx=(self.facing==-1)
 
     sfx(9)
@@ -1044,13 +1040,13 @@ function player:ground_input()
     --brake if moving in
     --opposite direction
     if self.vx>0 then self.vx*=.9 end
-    self.vx-=.2*dt
+    self.vx-=.05
     --pressing right
   elseif btn(1) then
     self.flipx=false
     self.facing=1
     if self.vx<0 then self.vx*=.9 end
-    self.vx+=.2*dt
+    self.vx+=.05
     --pressing neither, slow down
     --by our friction amount
   else
@@ -1060,9 +1056,9 @@ end --player.ground_input
 
 function player:air_input()
   if btn(0) then
-    self.vx-=0.15*dt
+    self.vx-=0.0375
   elseif btn(1) then
-    self.vx+=0.15*dt
+    self.vx+=0.0375
   end
 end --player.air_input
 
@@ -1070,7 +1066,7 @@ function player:movex()
   --xsteps is the number of
   --pixels we think we'll move
   --based on player.vx
-  local xsteps=abs(self.vx)*dt
+  local xsteps=abs(self.vx)
 
   --for each pixel we're
   --potentially x-moving,
@@ -1098,9 +1094,9 @@ end --player.movex
 function player:movey()
   --always apply gravity
   --(downward acceleration)
-  self.vy+=gravity*dt
+  self.vy+=gravity
 
-  local ysteps=abs(self.vy)*dt
+  local ysteps=abs(self.vy)
   for i=ysteps,0,-1 do
     local step=min(i,1)*sgn(self.vy)
     if m_collide(self,'y',step) then
@@ -1140,7 +1136,7 @@ function player:running_effects()
 
   -- if we're slow/still, then
   -- zero out the run timer
-  if abs(self.vx)<.3 then
+  if abs(self.vx)<.03 then
     self.runtimer=0
     -- otherwise if we're moving,
     -- tick the run timer and
@@ -1371,8 +1367,8 @@ function m_collide(entity,axis,distance,disable_callbacks)
 
   -- start the exit timer when player touches door
   local player_exiting = entity.is_player
-  and not lvl.exited
-  and (is_open_exit(tile1) or is_open_exit(tile2))
+                          and lvl and not lvl.exited
+                          and (is_open_exit(tile1) or is_open_exit(tile2))
   if player_exiting then player.exit_timer+=1 end
 
   -- check if either corner will hit a wall
@@ -2360,8 +2356,8 @@ function make_animation(obj,params)
 
     if params.draw then add(deferred_draws,params.draw) end
 
-    for dt=1,duration do
-      percent=easing(dt/duration)
+    for frames=1,duration do
+      percent=easing(frames/duration)
       for property,anim in pairs(anims) do
         obj[property]=anim.orig+percent*anim.delta
       end
