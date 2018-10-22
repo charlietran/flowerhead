@@ -914,6 +914,7 @@ function player:update()
 
   self.hit_spike_this_frame=false
 
+  -- apply "air resistance"
   -- each frame, reduce player x speed by 2%
   -- prevents player from going too fast
   self.vx*=0.98
@@ -1144,7 +1145,7 @@ function player:running_effects()
   else
     local oruntimer=self.runtimer
     self.runtimer+=abs(self.vx)*runanimspeed
-    if flr(oruntimer)!=flr(self.runtimer) then
+    if abs(self.vx)>1 and flr(oruntimer)!=flr(self.runtimer) then
       spawnp(
         self.x,     --x pos
         self.y+2,   --y pos
@@ -1169,7 +1170,7 @@ function player:landing_effects()
 
   --play a landing sound
   --based on current y speed
-  if self.landing_v>5 then
+  if self.landing_v>2 then
     sfx(15)
   else
     sfx(14)
@@ -1184,8 +1185,8 @@ function player:landing_effects()
     spawnp(
       self.x,
       self.y+2,
-      self.landing_v/8*(rnd(2)-1),
-      -self.landing_v/7*rnd(),
+      self.landing_v/3*(rnd(2)-1),
+      -self.landing_v/2*rnd(),
       .3
       )
   end
