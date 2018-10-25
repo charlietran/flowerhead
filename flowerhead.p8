@@ -1891,8 +1891,8 @@ bee_class={
   flipx=false,
   update_counter=0,
   update_interval=15,
-  max_vx=1,
-  max_vy=1,
+  max_vx=.5,
+  max_vy=.5,
   path={}
 }
 setmetatable(bee_class,{__index=entity_class})
@@ -1909,7 +1909,7 @@ function bee_class:new(obj)
 end
 
 function bee_class:jitter()
-  local offset=sin(time())*0.3
+  local offset=sin(time())*0.15
   self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
 
