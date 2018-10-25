@@ -17,17 +17,12 @@ function _init()
 
   printh("------\n")
 
-  gravity=.2
+  gravity=.05
   friction=.88
 
   -- speed of our animation loops
-  runanimspeed=.12
+  runanimspeed=.3
   wallrunanimspeed=.2
-
-  -- delta time multiplier,
-  -- essentially controls the
-  -- speed of the game
-  dt=.5
 
   -- game length timer
   gametime=0
@@ -611,7 +606,7 @@ end
 
 function entity_class:move()
   -- move through all our x steps, then our y steps
-  local xsteps=abs(self.vx)*dt
+  local xsteps=abs(self.vx)
   local step,collision
   for i=xsteps,0,-1 do
     step=min(i,1)*sgn(self.vx)
@@ -626,10 +621,10 @@ function entity_class:move()
   end
 
   if self.has_gravity then
-    self.vy+=gravity*dt
+    self.vy+=gravity
   end
 
-  local ysteps=abs(self.vy)*dt
+  local ysteps=abs(self.vy)
   for i=ysteps,0,-1 do
     step=min(i,1)*sgn(self.vy)
     collision=self.map_collide and m_collide(self,'y',step)
@@ -779,7 +774,7 @@ function player:init()
 
     --instantaneous jump velocity
     --the "power" of the jump
-    jumpv=3,
+    jumpv=1.5,
 
     --movement states
     standing=false,
@@ -867,7 +862,7 @@ function player:draw()
       self.spr=64+self.runtimer%3
     end
   elseif self.wallsliding	then
-    self.spr=96+flr(player.runtimer%4)
+    self.spr=96+flr(self.runtimer%4)
   else
     if self.vy<0 then
       self.spr=80 -- jumping up
@@ -918,6 +913,11 @@ function player:update()
   end
 
   self.hit_spike_this_frame=false
+
+  -- apply "air resistance"
+  -- each frame, reduce player x speed by 2%
+  -- prevents player from going too fast
+  self.vx*=0.98
 
   --move the player, x then y
   self:movex()
@@ -970,9 +970,6 @@ function player:handle_input()
   if btnp(5,1) then
     levels:goto_next()
   end
-
-  --overall x speed tweak to make things feel right
-  self.vx*=0.98
 end
 
 function player.jump_input(p)
@@ -997,8 +994,8 @@ function player:bomb_input()
 
   local release_bomb=self.bomb_input_timer==7 or (not bomb_pressed and self.bomb_input_timer>0)
   if not self.is_bombing and release_bomb then
-    local bomb_vy = -self.bomb_input_timer*0.4
-    local bomb_vx = self.facing*self.bomb_input_timer*0.2 + self.vx*0.6
+    local bomb_vy = -self.bomb_input_timer*0.2
+    local bomb_vx = self.facing*self.bomb_input_timer*0.1 + self.vx*0.6
     self.is_bombing=true
     self.throwtimer=7
     bomb_class:new({
@@ -1029,7 +1026,7 @@ function player:movejump()
     --set x velocity / direction
     --based on wall facing
     --(looking away from wall)
-    self.vx=self.facing*2
+    self.vx=self.facing
     self.flipx=(self.facing==-1)
 
     sfx(9)
@@ -1044,13 +1041,13 @@ function player:ground_input()
     --brake if moving in
     --opposite direction
     if self.vx>0 then self.vx*=.9 end
-    self.vx-=.2*dt
+    self.vx-=.05
     --pressing right
   elseif btn(1) then
     self.flipx=false
     self.facing=1
     if self.vx<0 then self.vx*=.9 end
-    self.vx+=.2*dt
+    self.vx+=.05
     --pressing neither, slow down
     --by our friction amount
   else
@@ -1060,9 +1057,9 @@ end --player.ground_input
 
 function player:air_input()
   if btn(0) then
-    self.vx-=0.15*dt
+    self.vx-=0.0375
   elseif btn(1) then
-    self.vx+=0.15*dt
+    self.vx+=0.0375
   end
 end --player.air_input
 
@@ -1070,7 +1067,7 @@ function player:movex()
   --xsteps is the number of
   --pixels we think we'll move
   --based on player.vx
-  local xsteps=abs(self.vx)*dt
+  local xsteps=abs(self.vx)
 
   --for each pixel we're
   --potentially x-moving,
@@ -1098,9 +1095,9 @@ end --player.movex
 function player:movey()
   --always apply gravity
   --(downward acceleration)
-  self.vy+=gravity*dt
+  self.vy+=gravity
 
-  local ysteps=abs(self.vy)*dt
+  local ysteps=abs(self.vy)
   for i=ysteps,0,-1 do
     local step=min(i,1)*sgn(self.vy)
     if m_collide(self,'y',step) then
@@ -1140,7 +1137,7 @@ function player:running_effects()
 
   -- if we're slow/still, then
   -- zero out the run timer
-  if abs(self.vx)<.3 then
+  if abs(self.vx)<.03 then
     self.runtimer=0
     -- otherwise if we're moving,
     -- tick the run timer and
@@ -1148,7 +1145,7 @@ function player:running_effects()
   else
     local oruntimer=self.runtimer
     self.runtimer+=abs(self.vx)*runanimspeed
-    if flr(oruntimer)!=flr(self.runtimer) then
+    if abs(self.vx)>1 and flr(oruntimer)!=flr(self.runtimer) then
       spawnp(
         self.x,     --x pos
         self.y+2,   --y pos
@@ -1173,7 +1170,7 @@ function player:landing_effects()
 
   --play a landing sound
   --based on current y speed
-  if self.landing_v>5 then
+  if self.landing_v>2 then
     sfx(15)
   else
     sfx(14)
@@ -1188,8 +1185,8 @@ function player:landing_effects()
     spawnp(
       self.x,
       self.y+2,
-      self.landing_v/8*(rnd(2)-1),
-      -self.landing_v/7*rnd(),
+      self.landing_v/3*(rnd(2)-1),
+      -self.landing_v/2*rnd(),
       .3
       )
   end
@@ -1371,8 +1368,8 @@ function m_collide(entity,axis,distance,disable_callbacks)
 
   -- start the exit timer when player touches door
   local player_exiting = entity.is_player
-  and not lvl.exited
-  and (is_open_exit(tile1) or is_open_exit(tile2))
+                          and lvl and not lvl.exited
+                          and (is_open_exit(tile1) or is_open_exit(tile2))
   if player_exiting then player.exit_timer+=1 end
 
   -- check if either corner will hit a wall
@@ -1894,8 +1891,8 @@ bee_class={
   flipx=false,
   update_counter=0,
   update_interval=15,
-  max_vx=1,
-  max_vy=1,
+  max_vx=.5,
+  max_vy=.5,
   path={}
 }
 setmetatable(bee_class,{__index=entity_class})
@@ -1912,7 +1909,7 @@ function bee_class:new(obj)
 end
 
 function bee_class:jitter()
-  local offset=sin(time())*0.3
+  local offset=sin(time())*0.15
   self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
 
@@ -2360,8 +2357,8 @@ function make_animation(obj,params)
 
     if params.draw then add(deferred_draws,params.draw) end
 
-    for dt=1,duration do
-      percent=easing(dt/duration)
+    for frames=1,duration do
+      percent=easing(frames/duration)
       for property,anim in pairs(anims) do
         obj[property]=anim.orig+percent*anim.delta
       end
@@ -2518,25 +2515,25 @@ c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5cccccccccccccccccccccccccccccccccccccccc
 66666667000000777700000000000070011111100111111000011110011111106677700000000000000000000000000000000000000000000000000000000000
 00e0000000e0000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000e00000005550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-66600000060000006660000000000000050055000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-06000000666000000660000066600000000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-60600000060000006000000060600000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+44400000040000004440000000000000050055000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+04000000444000000440000044400000000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+40400000040000004000000040400000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00e0000000e0000000e0000000e0000000e0000000e00000000000000b3033000b030000030000003000000300000303000b3033000000000000000000000000
-00600000606000000060000060600000006000000060000000000000bfb33330bf333000bf330000b300003fb3003bf330bfb333300000000000000000000000
-660000000600000006000000060000000600000066000000000000003fb333303f3330003f330000b300003f330033f3303fb333300000000000000000000000
-0660000066000000066000000660000006000000066000000000000033f333300fb330003f3300003300003f330003fb3033f333300000000000000000000000
-60000000006000000600000006000000606000000600000000000000033333000333300003300000330000033000033330033333000000000000000000000000
+00400000404000000040000040400000004000000040000000000000bfb33330bf333000bf330000b300003fb3003bf330bfb333300000000000000000000000
+440000000400000004000000040000000400000044000000000000003fb333303f3330003f330000b300003f330033f3303fb333300000000000000000000000
+0440000044000000044000000440000004000000044000000000000033f333300fb330003f3300003300003f330003fb3033f333300000000000000000000000
+40000000004000000400000004000000404000000400000000000000033333000333300003300000330000033000033330033333000000000000000000000000
 00000000000000000000000000000000000000000000000000000000003330000033000003300000330000033000003300003330000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000300000030000003000000300000030000003000000300000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 e0000000e0000000e0000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-606000006060000060600000606000000000000000000000000000000b3033100313100003100000310000031000031310000000000000000000000000000000
-06000000060000000600000006000000000000000000000000000000b6b33330b6333100b6310000b1000036b1003b6331000000000000000000000000000000
-0660000006000000060000000600000000000000000000000000000036b333303633310036310000b10000363100336331000000000000000000000000000000
-06000000006000000600000000600000000000000000000000000000036b331006b3100036310000310000363100036b10000000000000000000000000000000
+404000004040000040400000404000000000000000000000000000000b3033100313100003100000310000031000031310000000000000000000000000000000
+04000000040000000400000004000000000000000000000000000000b6b33330b6333100b6310000b1000036b1003b6331000000000000000000000000000000
+0440000004000000040000000400000000000000000000000000000036b333303633310036310000b10000363100336331000000000000000000000000000000
+04000000004000000400000000400000000000000000000000000000036b331006b3100036310000310000363100036b10000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000003331000033100003100000310000031000033310000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000310000031000003100000310000031000003100000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000100000011000001100000110000011000001100000000000000000000000000000000
