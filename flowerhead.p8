@@ -1274,7 +1274,7 @@ function player:hit_spike()
     spawnp(
       self.x,
       self.y+2,
-      sgn(self.vx)*rnd(3), -- vx
+      sgn(self.vx)*(-0.5 + rnd(2))*rnd(4), -- vx
       -7.5*rnd(), -- vy
       1, -- jitter
       7, -- color
@@ -1964,8 +1964,8 @@ function bee_class:e_collide_callback(entity)
 
   -- kill the player if touching, then recall bees to the door
   if entity.is_player then
-    entity:hit_spike()
-    bees:recall()
+    player.spike_timer=5
+    player:hit_spike()
 
     -- if hit by a bomb, grow 20%, until exploding at 200% escale
   elseif entity.is_bomb then
@@ -2063,21 +2063,6 @@ function bees:make_spawn_effect(x,y,vx,vy,duration)
     for i=1,duration do
       spawnp(x,y,vx,vy,.25,10)
       yield()
-    end
-  end
-end
-
--- retarget all bees back towards the door
-function bees:recall()
-  for _,e in pairs(entities) do
-      if e.is_bee then
-      e.pathfinder.enabled=false
-      e.target_x=lvl.door_sx
-      e.target_y=lvl.door_sy
-      add(coroutines,coroutine_sequence({
-        make_delay(240),
-        function() e.pathfinder.enabled=true end
-      }))
     end
   end
 end
