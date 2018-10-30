@@ -1555,7 +1555,7 @@ function grasses.update_tile(cx,cy)
     add(lvl.changed_tiles,{cx,cy,ot})
 
     -- spawn a bee if necessary
-    if lvl.bee_index[lvl.planted] then
+    if toggles.max_beez or lvl.bee_index[lvl.planted] then
       bees:spawn(cx,cy)
       -- flag that the bee has been spawned
       lvl.bee_index[lvl.planted]=false
@@ -2050,13 +2050,13 @@ function bees:spawn(cx,cy)
     -- make a spawn effect centered above the tile
     bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
     -- add our new bee to the bee list
-    function() if not player.is_dead then add(entities,bee) end end,
+    function() add(entities,bee) end,
     -- animate the bee zooming from its initial big size down to normal
     make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},duration=60}),
     -- after our specified delay, then enable pathfinding
     make_delay(bees.spawn_pathfinding_delay),
     function() bee.pathfinder.enabled=true; bee.spawning=false end
-  })
+  },true)
 
   add(coroutines,seq)
 end
@@ -2066,6 +2066,7 @@ end
 function bees:make_spawn_effect(x,y,vx,vy,duration)
   return function()
     for i=1,duration do
+      if player.dead then return end
       spawnp(x,y,vx,vy,.25,10)
       yield()
     end
@@ -2117,6 +2118,7 @@ function pathfinder_class:update(target_entity)
   self.search_bound=manhattan_distance(start_cell,self.goal_cell)
 
   local path_cell = self:search_frontier()
+  if not path_cell then return end
   self.path={path_cell,self.goal_cell}
   local path_index=cell_to_index(path_cell)
 
@@ -2372,9 +2374,12 @@ function make_delay(dur)
   return function() for i=1,dur do yield() end end
 end
 
-function coroutine_sequence(fns)
+function coroutine_sequence(fns,stop_if_player_dead)
   return cocreate(function()
-    for _,fn in pairs(fns) do fn() end
+    for _,fn in pairs(fns) do
+      if stop_if_player_dead and player.dead then return end
+      fn()
+    end
   end)
 end
 
@@ -2410,6 +2415,7 @@ game_mode.debug_menu.items={}
 toggles={
   a_star=true,
   bee_move=true,
+  max_beez=false,
 }
 
 function game_mode.debug_menu:update()
@@ -2427,6 +2433,7 @@ function game_mode.debug_menu:update()
   self:make_toggle"performance"
   self:make_toggle"path_vis"
   self:make_toggle"a_star"
+  self:make_toggle"max_beez"
   add(self.items,{
       "spawn bee", function()
         add(entities,
