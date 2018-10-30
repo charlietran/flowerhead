@@ -713,7 +713,8 @@ end
 
 function flowerheart_class:e_collide_callback(entity)
   if not entity.is_player then return end
-  if lvl.index==3 then
+  if lvl.index==3 and not flowerheart_obtained then
+    flowerheart_obtained=1
     music(11)
     freeze=true
     cinematic(
@@ -2049,7 +2050,7 @@ function bees:spawn(cx,cy)
     -- make a spawn effect centered above the tile
     bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
     -- add our new bee to the bee list
-    function() add(entities,bee) end,
+    function() if not player.is_dead then add(entities,bee) end end,
     -- animate the bee zooming from its initial big size down to normal
     make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},duration=60}),
     -- after our specified delay, then enable pathfinding
