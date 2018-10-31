@@ -405,7 +405,7 @@ function levels:init()
         index=8,
         cx1=0,cy1=16,
         num_bees=4,
-        desc="the bee box",
+        desc="please feed the bees",
       }),
     level_class.new({
         index=16,
@@ -763,72 +763,72 @@ player={}
 setmetatable(player,{__index=entity_class})
 
 function player:init()
-  local player_init={
-    name="player",
-    scale=1,
-    is_player=1,
-    -- velocity
-    vx=0,
-    vy=0,
-    --lists of our previous positions/flippage for effects rendering
-    prevx=0,
-    prevy=0,
-    prevf=0,
-    --the "effects" timer
-    etimer=0,
-    --the sprite is 3x5, so the
-    --wr and hr dimensions are
-    --radii, and x/y is the
-    --initial center position
-    wr=1,
-    hr=2,
-    w=3,
-    h=5,
-
-    hit_jump=false,
-
-    --instantaneous jump velocity
-    --the "power" of the jump
-    jumpv=1.5,
-
-    --movement states
-    standing=false,
-    wallsliding=false,
-
-    disable_input=false,
-
-    --what direction we're facing
-    --1 or -1, used when we're
-    --facing away from a wall
-    --while sliding
-    facing=1,
-
-    --bomb input state
-    throw_bomb=false,
-    is_bombing=false,
-    bomb_input_timer=0,
-
-    --timers used for animation
-    --states and particle fx
-    falltimer=7,
-    landtimer=0,
-    runtimer=0,
-    headanimtimer=0,
-    throwtimer=0,
-
-    dead=false,
-    dying=false,
-    dying_timer=0,
-
-    exit_timer=0,
-    spike_timer=0,
-
-    spr=64,
-    x=lvl.spawnx,
-    y=lvl.spawny,
-  }
-  for k,v in pairs(player_init) do player[k]=v end
+  for k,v in pairs(player_init_vals) do player[k]=v end
+  self.x=lvl.spawnx
+  self.y=lvl.spawny
 end
+
+player_init_vals={
+  name="player",
+  scale=1,
+  is_player=1,
+  -- velocity
+  vx=0,
+  vy=0,
+  --lists of our previous positions/flippage for effects rendering
+  prevx=0,
+  prevy=0,
+  prevf=0,
+  --the "effects" timer
+  etimer=0,
+  --the sprite is 3x5, so the
+  --wr and hr dimensions are
+  --radii, and x/y is the
+  --initial center position
+  wr=1,
+  hr=2,
+  w=3,
+  h=5,
+
+  hit_jump=false,
+
+  --instantaneous jump velocity
+  --the "power" of the jump
+  jumpv=1.5,
+
+  --movement states
+  standing=false,
+  wallsliding=false,
+
+  disable_input=false,
+
+  --what direction we're facing
+  --1 or -1, used when we're
+  --facing away from a wall
+  --while sliding
+  facing=1,
+
+  --bomb input state
+  throw_bomb=false,
+  is_bombing=false,
+  bomb_input_timer=0,
+
+  --timers used for animation
+  --states and particle fx
+  falltimer=7,
+  landtimer=0,
+  runtimer=0,
+  headanimtimer=0,
+  throwtimer=0,
+
+  dead=false,
+  dying=false,
+  dying_timer=0,
+
+  exit_timer=0,
+
+  spr=64,
+}
 
 -- player sprite numbers------
 --64 standing
@@ -842,7 +842,6 @@ end
 --98 sliding 3 / hanging
 --99 sliding 4
 
-draw_player_box=false
 player.colls={}
 function player:draw()
   if self.dead then return end
@@ -888,24 +887,13 @@ function player:draw()
 
   -- draw the player sprite
   spr(
-    self.spr,   -- sprite
-    self.x-self.wr,-- x pos
-    self.y-self.hr,-- y pos
-    0.375,   -- width .375*8=3px
-    0.625,   -- height.625*8=5px
-    self.flipx  -- flip x
-    )
-
-  if draw_player_box then
-    rect(self.x-self.wr,self.y-self.hr,self.x+self.wr,self.y+self.hr,11)
-    if #player.colls>1 then
-      for coll in all(player.colls) do
-        local cx1,cy1=coll[1],coll[2]
-        rect(cx1*8,cy1*8,cx1*8+7,cy1*8+7,8)
-      end
-      player.colls={}
-    end
-  end
+    self.spr,
+    self.x-self.wr, -- x pos
+    self.y-self.hr, -- y pos
+    0.375,          -- width .375*8=3px
+    0.625,          -- height.625*8=5px
+    self.flipx      -- flip x
+  )
 end
 
 function player:update()
@@ -941,9 +929,6 @@ function player:update()
   self:jump()
   self:effects()
 
-  if not self.hit_spike_this_frame then
-    self.spike_timer=0
-  end
 end
 
 function player:check_sliding()
@@ -1366,11 +1351,6 @@ function m_collide(entity,axis,distance,disable_callbacks)
   local cx1,cy1,cx2,cy2=flr(x1/8),flr(y1/8),flr(x2/8),flr(y2/8)
   local tile1=mget(cx1,cy1)
   local tile2=mget(cx2,cy2)
-
-  if draw_player_box and entity.is_player and not disable_callbacks then
-    add(player.colls,{cx1,cy1})
-    add(player.colls,{cx2,cy2})
-  end
 
   if not disable_callbacks and (spike_collide(tile1,x1,y1) or spike_collide(tile2,x2,y2)) then
     entity:hit_spike()
@@ -1997,7 +1977,6 @@ function bee_class:e_collide_callback(entity)
 
   -- kill the player if touching, then recall bees to the door
   if entity.is_player then
-    player.spike_timer=5
     player:hit_spike()
 
     -- if hit by a bomb, grow 20%, until exploding at 200% escale
