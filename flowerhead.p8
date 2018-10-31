@@ -736,7 +736,6 @@ function flowerheart_class:e_collide_callback(entity)
         self:enable_bombing()
         music(0)
         sfx(7)
-        printh(123)
       end,
       3
       )
@@ -933,8 +932,8 @@ function player:update()
   --move the player, x then y
   self:movex()
   self:movey()
-  self:movejump()
   self:check_sliding()
+  self:jump()
   self:effects()
 
   if not self.hit_spike_this_frame then
@@ -944,20 +943,22 @@ end
 
 function player:check_sliding()
   self.wallsliding=false
+  if m_collide(self,'y',1,true) then return end
+
   --sliding on wall to the right?
-  if not m_collide(self,'y',1,true) then
-    if m_collide(self,'x',1,true) then
-      self.wallsliding=true
-      self.facing=-1
-      if self.vy>0 then self.vy*=.97 end
-      --sliding on wall to the left?
-    elseif m_collide(self,'x',-1,true) then
-      self.wallsliding=true
-      self.facing=1
-      if self.vy>0 then self.vy*=.97 end
-    else
-      self.facing=self.flipx and -1 or 1
-    end
+  if m_collide(self,'x',1,true) then
+    self.wallsliding=true
+    self.facing=-1
+    self.flipx=false
+    if self.vy>0 then self.vy*=.97 end
+  --sliding on wall to the left?
+  elseif m_collide(self,'x',-1,true) then
+    self.wallsliding=true
+    self.facing=1
+    self.flipx=true
+    if self.vy>0 then self.vy*=.97 end
+  else
+    self.facing=self.flipx and -1 or 1
   end
 end
 
@@ -983,14 +984,14 @@ function player:handle_input()
   end
 end
 
-function player.jump_input(p)
+function player:jump_input()
   local jump_pressed=btn(4)
-  if jump_pressed and not p.is_jumping then
-    p.hit_jump=true
+  if jump_pressed and not self.is_jumping then
+    self.hit_jump=true
   else
-    p.hit_jump=false
+    self.hit_jump=false
   end
-  p.is_jumping=jump_pressed
+  self.is_jumping=jump_pressed
 end --player.jump_input
 
 function player:bomb_input()
@@ -1018,7 +1019,7 @@ function player:bomb_input()
   end
 end -- player.bomb_input
 
-function player:movejump()
+function player:jump()
   --if standing, or if only just
   --started falling, then jump
   if not self.hit_jump then return false end
@@ -1038,11 +1039,14 @@ function player:movejump()
     --based on wall facing
     --(looking away from wall)
     self.vx=self.facing
+    -- immediately kick away one pixel to prevent
+    -- a wallsliding collision next frame
+    self.x+=self.facing
     self.flipx=(self.facing==-1)
 
     sfx(9)
   end
-end --player.movejump
+end --player:jump
 
 function player:ground_input()
   -- pressing left
@@ -1120,9 +1124,9 @@ function player:movey()
       end
 
       --zero out y velocity and
-      --reset falling timer
       self.vy=0
-      self.falltimer=0
+      --reset falling timer if touched ground
+      if step>0 then self.falltimer=0 end
     else
       --no y collision detected
       self.y+=step
@@ -2047,8 +2051,6 @@ bees={
 }
 
 function bees:spawn(cx,cy)
-  printh('spawning bee')
-
   -- the bee randomly flies in from left or right
   local dir=sgn(-1+rnd(2))
   local bee=bee_class:new({
