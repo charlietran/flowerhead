@@ -821,6 +821,10 @@ player_init_vals={
   headanimtimer=0,
   throwtimer=0,
 
+  -- jump buffer timing
+  jump_buffer=8,
+  jump_buffer_timer=9,
+
   dead=false,
   dying=false,
   dying_timer=0,
@@ -928,7 +932,6 @@ function player:update()
   self:check_sliding()
   self:jump()
   self:effects()
-
 end
 
 function player:check_sliding()
@@ -977,11 +980,10 @@ end
 function player:jump_input()
   local jump_pressed=btn(4)
   if jump_pressed and not self.is_jumping then
-    self.hit_jump=true
-  else
-    self.hit_jump=false
+    self.jump_buffer_timer=0
   end
-  self.is_jumping=jump_pressed
+  self.jump_buffer_timer+=1
+  self.is_jumping = jump_pressed
 end --player.jump_input
 
 function player:bomb_input()
@@ -1010,14 +1012,14 @@ function player:bomb_input()
 end -- player.bomb_input
 
 function player:jump()
-  --if standing, or if only just
-  --started falling, then jump
-  if not self.hit_jump then return false end
+  if self.jump_buffer_timer > self.jump_buffer then return end
 
   if self.standing then
+    self.jump_buffer_timer = self.jump_buffer
     self.vy=min(self.vy,-self.jumpv)
     -- allow walljump if sliding
   elseif self.wallsliding then
+    self.jump_buffer_timer = self.jump_buffer
     --use normal jump speed,
     --but proportionate to how
     --fast player is currently
