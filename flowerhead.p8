@@ -14,7 +14,6 @@ game_mode={
 
 function _init()
   current_game_mode=game_mode.intro
-
   printh("------\n")
 
   gravity=.05
@@ -967,14 +966,15 @@ function player:handle_input()
   end
 
   -- press lshift or tab for debug menu
-  if btnp(4,1) then
+  if btnp(6) then
+    poke(0x5f30,1)
     current_game_mode=game_mode.debug_menu
   end
 
   -- press a or q to skip level
-  if btnp(5,1) then
-    levels:goto_next()
-  end
+  --if btnp(5,1) then
+    --levels:goto_next()
+  --end
 end
 
 function player:jump_input()
@@ -2456,13 +2456,24 @@ function game_mode.debug_menu:update()
   end
   self.sel=mid(self.sel,1,#self.items)
   if btnp(4) then self.items[self.sel][2]() end
-  if btnp(4,1) then current_game_mode=game_mode.game end
+  if btnp(6) then
+    poke(0x5f30,1)
+    current_game_mode=game_mode.game
+  end
 
   self.items={}
+  add(self.items,{
+      "skip to next level", function() levels:goto_next() end
+    })
+  add(self.items,{
+      "reset game", function() run() end
+    })
+
   self:make_toggle"performance"
   self:make_toggle"path_vis"
   self:make_toggle"a_star"
   self:make_toggle"max_beez"
+
   add(self.items,{
       "spawn bee", function()
         add(entities,
@@ -2471,9 +2482,6 @@ function game_mode.debug_menu:update()
       end
     })
   self:make_toggle"bee_move"
-  add(self.items,{
-      "skip to next level", function() levels:goto_next() end
-    })
   add(self.items,{
       "open current door", function() lvl:open_door(true) end
     })
@@ -2486,7 +2494,7 @@ function game_mode.debug_menu:draw()
   cls()
   camera(0,0)
   print("--- debugging ---",10,2,15)
-  print("press tab to exit",10,10,15)
+  print("press enter to exit",10,10,15)
   cursor(10,10)
   for index,item in pairs(self.items) do
     local y_off=24+(index-1)*8
