@@ -407,9 +407,10 @@ function levels:init()
         desc="please feed the bees",
       }),
     level_class.new({
-        index=16,
+        index=10,
         cx1=94,cy1=28,
         num_bees=4,
+        desc="the throne room"
       })
   }
 
@@ -1869,7 +1870,11 @@ function cam:position()
     shake.x=rnd(self.shake_force)-self.shake_force/2
     shake.y=rnd(self.shake_force)-self.shake_force/2
   end
-  return self.x-64+shake.x,self.y-64+shake.y
+  if toggles.center_on_player then
+    return player.x-64,player.y-64
+  else
+    return self.x-64+shake.x,self.y-64+shake.y
+  end
 end
 
 function cam:shake(ticks, force)
@@ -2470,6 +2475,7 @@ function game_mode.debug_menu:update()
     })
 
   self:make_toggle"performance"
+  self:make_toggle"center_on_player"
   self:make_toggle"path_vis"
   self:make_toggle"a_star"
   self:make_toggle"max_beez"
