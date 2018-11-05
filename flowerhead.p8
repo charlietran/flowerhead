@@ -1386,20 +1386,29 @@ end
 -- 49 left
 -- 50 right
 -- 51 down
+
+spike_hitboxes={
+  --48 up mini spike
+  {1,4,7,8},
+  --49 left mini spike
+  {4,1,8,7},
+  --50 right mini spike
+  {0,1,4,7},
+  --51 down mini spike,
+  {1,0,7,4},
+  --52 up big spike
+  {1,1,7,8},
+  --53 right big spike
+  {1,1,8,7},
+  --54 left big spike
+  {0,1,7,7},
+  --55 down big spike
+  {1,0,7,7}
+}
 function spike_collide(tile,x,y)
   if not is_spike(tile) then return end
-
-  if tile==48 then
-    return y%8>4
-  elseif tile==49 then
-    return x%8>4
-  elseif tile==50 then
-    return x%8<4
-  elseif tile==51 then
-    return y%8<4
-  elseif tile > 51 and tile < 56 then
-    return true
-  end
+  local xpos,ypos,hb=x%8,y%8,spike_hitboxes[tile-47]
+  return xpos>hb[1] and xpos<hb[3] and ypos>hb[2] and ypos< hb[4]
 end
 
 -- entity collisions
