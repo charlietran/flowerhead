@@ -314,9 +314,12 @@ end
 
 function level_class:make_door_anim(with_rays)
   local x,y=self.door_cx*8+5,self.door_cy*8+2
+  local frame_count=0
 
   return function()
     if not with_rays then return end
+    if frame_count>240 then return end
+    frame_count+=1
     local t=time()
     local rays=16
     local dx,dy=player.x-x,player.y-y
@@ -325,6 +328,9 @@ function level_class:make_door_anim(with_rays)
     -- divided then re-multiplied by 1000
     -- to avoid integer overflow
     local distance=sqrt((dx/1000)^2+(dy/1000)^2)*1000
+    if frame_count>120 then
+    distance*=(1-(frame_count-120)/120)
+    end
 
     -- get the angle to the player
     local angle=0.5+atan2(dx,dy)
