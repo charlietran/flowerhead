@@ -1597,7 +1597,7 @@ bomb_class={
   wr=1,hr=1,
   vy=-2.5,
   spr_x=16,spr_y=8,
-  anim={timer=0,frames=8,speed=1/3}
+  anim={timer=0,frames=8,speed=1/6}
 }
 setmetatable(bomb_class,{__index=entity_class})
 
