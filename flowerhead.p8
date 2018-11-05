@@ -990,17 +990,13 @@ end --player.jump_input
 function player:bomb_input()
   local bomb_pressed=btn(5)
 
-  if self.is_bombing and not bomb_pressed then
+  if not bomb_pressed then
     self.is_bombing=false
-    self.bomb_input_timer=0
-  elseif not self.is_bombing and bomb_pressed then
-    self.bomb_input_timer+=1
   end
 
-  local release_bomb=self.bomb_input_timer==7 or (not bomb_pressed and self.bomb_input_timer>0)
-  if not self.is_bombing and release_bomb then
-    local bomb_vy = -self.bomb_input_timer*0.2
-    local bomb_vx = self.facing*self.bomb_input_timer*0.1 + self.vx*0.6
+  if not self.is_bombing and bomb_pressed then
+    local bomb_vy = -1.5
+    local bomb_vx = self.facing*rnd(0.3)+self.vx*1.1
     self.is_bombing=true
     self.throwtimer=7
     bomb_class:new({
