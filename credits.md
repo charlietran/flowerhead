@@ -9,3 +9,5 @@ Thanks to the following people for their help and support:
 * [Lillian Primrose](https://twitter.com/id_load_error) for showing me how to do
   A\* pathfinding
 * [Ayla Myers](https://brid.gs) for inspiring me with their awesome PICO-8 work 
+* [Kicked-in-Teeth](https://kicked-in-teeth.itch.io/pico-8-tiles) whose awesome
+  free art I used in the game
