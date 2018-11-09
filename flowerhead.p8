@@ -1733,6 +1733,7 @@ function game_mode.intro:init()
   self.a=0
   self.r=2
   self.title="flowerhead"
+  self.subtitle="by charlie tran"
   self.prompt="press up to start"
   self.animtimer=0
   self.animlength=8
@@ -1776,13 +1777,13 @@ function game_mode.intro:draw()
     y=sin(i/16+time()/8)*4
     print(
       sub(self.title,i,i),
-      64 - #self.title*4  + ((i-1)*8),
+      66 - #self.title*4  + ((i-1)*8),
       50+y,
       3)
     if i==5 then sy=50+y-5 end
   end
 
-  spr(64,56,sy)
+  spr(64,58,sy)
 
   if self.animtimer%3==0 then
     spawnp(
@@ -1795,13 +1796,17 @@ function game_mode.intro:draw()
       .7 -- duration
       )
   end
-  -- print "press x to start"
-  -- in a static position
+    print(
+      self.subtitle,
+      64-#self.subtitle*2,
+      70,
+      13
+      )
   if self.animtimer < 6 then
     print(
       self.prompt,
       64-#self.prompt*2,
-      80,
+      88,
       7
       )
   end
