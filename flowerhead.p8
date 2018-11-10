@@ -1734,14 +1734,14 @@ function game_mode.intro:init()
   self.r=2
   self.title="flowerhead"
   self.subtitle="by charlie tran"
-  self.prompt="press up to start"
+  self.prompt="press x to start"
   self.animtimer=0
   self.animlength=8
   music(1)
 end
 
 function game_mode.intro:update()
-  if btnp(2) then
+  if btnp(5) then
     current_game_mode=game_mode.game
     reset_level()
     music(0)
