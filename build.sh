@@ -12,3 +12,6 @@ comment='\
 sed -i '' "s@__lua__@__lua__\
 $comment\
 @" flowerhead_build.p8
+
+/Applications/PICO-8.app/Contents/MacOS/pico8 flowerhead_build
+cp -v ~/dev/pico8/cart.js ~/dev/charlietran.com/games/flowerhead/cart.js
