@@ -5,11 +5,11 @@ __lua__
 -- by charlie tran
 
 game_mode={
-  intro={is_intro=1},
+  intro={},
   game={is_game=1},
-  lvl_complete={is_lvl_complete=1},
-  outro={is_outro=1, animtimer=0},
-  debug_menu={is_debug_menu=1},
+  lvl_complete={},
+  outro={animtimer=0},
+  debug_menu={}
 }
 
 function _init()
@@ -91,7 +91,7 @@ function game_mode.game:draw()
 end
 
 clouds={
-  speed=0.1,
+  speed=.1,
   padding=40,
 }
 clouds.list={}
@@ -184,7 +184,7 @@ function clouds:draw()
     -- so that the clouds appear
     -- to drift to the left
 
-    local xdrift  = 0.1*cam.x+tm
+    local xdrift  = .1*cam.x+tm
     local xoffset = cloud.x-xdrift*cloud.size*clouds.speed
     local xrange  = 128+clouds.padding+2*cloud.size
 
@@ -311,16 +311,20 @@ end
 
 function level_class:open_door(with_rays)
   self.door_open=true
-  if with_rays then sfx(0,2) end
-  add(deferred_draws,self:make_door_anim(with_rays))
+  if with_rays then 
+  	sfx(0,2) 
+   add(
+   	deferred_draws,
+   	self:make_door_anim()
+   )
+  end
 end
 
-function level_class:make_door_anim(with_rays)
+function level_class:make_door_anim()
   local x,y=self.door_cx*8+5,self.door_cy*8+2
   local frame_count=0
 
   return function()
-    if not with_rays then return end
     if frame_count>240 then return end
     frame_count+=1
     local t=time()
@@ -336,7 +340,7 @@ function level_class:make_door_anim(with_rays)
     end
 
     -- get the angle to the player
-    local angle=0.5+atan2(dx,dy)
+    local angle=.5+atan2(dx,dy)
 
     for i=1,rays do
       -- tmod is a time offset so that each ray
@@ -349,7 +353,7 @@ function level_class:make_door_anim(with_rays)
 
       -- modify distance so that it shrinks while
       -- pointing away from the player
-      local dmod=-0.7*cos(dmod_angle)*(1-.2*cos(t/4))
+      local dmod=-.7*cos(dmod_angle)*(1-.2*cos(t/4))
 
       fillp(0b0011100111000110.1)
       line(
@@ -401,19 +405,19 @@ function levels:init()
     level_class.new({
         index=6,
         cx1=112,cy1=0,
-        desc="around the bend",
+        desc="z jumpin'",
       }),
     level_class.new({
         index=7,
         cx1=78,cy1=0,
         num_bees=2,
-        desc="watch for bees",
+        desc="here there be bees",
       }),
     level_class.new({
         index=8,
         cx1=0,cy1=16,
         num_bees=4,
-        desc="please feed the bees",
+        desc="feeding time",
       }),
     level_class.new({
         index=9,
@@ -432,11 +436,11 @@ end -- levels:init
 function levels:draw()
   -- animate the door
   if lvl.door_open then
-    self.door_frame=(self.door_frame+1/16)%5
-    mset(lvl.door_cx,lvl.door_cy,37+(self.door_frame))
+    self.door_frame=(self.door_frame+.0625)%5
+    mset(lvl.door_cx,lvl.door_cy,37+self.door_frame)
   else
-    self.door_frame=(self.door_frame+1/16)%5
-    mset(lvl.door_cx,lvl.door_cy,32+(self.door_frame))
+    self.door_frame=(self.door_frame+.0625)%5
+    mset(lvl.door_cx,lvl.door_cy,32+self.door_frame)
   end
 
 
@@ -719,7 +723,7 @@ flowerheart_class={
   w=7,h=7,
   wr=3,hr=3,
   spr_x=56,spr_y=40,
-  anim={timer=0,frames=7,speed=1/7}
+  anim={timer=0,frames=7,speed=.142857143}
 }
 setmetatable(flowerheart_class,{__index=entity_class})
 
@@ -901,8 +905,8 @@ function player:draw()
     self.spr,
     self.x-self.wr, -- x pos
     self.y-self.hr, -- y pos
-    0.375,          -- width .375*8=3px
-    0.625,          -- height.625*8=5px
+    .375,           -- width .375*8=3px
+    .625,           -- height.625*8=5px
     self.flipx      -- flip x
   )
 end
@@ -922,7 +926,7 @@ function player:update()
   -- apply "air resistance"
   -- each frame, reduce player x speed by 2%
   -- prevents player from going too fast
-  self.vx*=0.98
+  self.vx*=.98
 
   self.falltimer+=1
   self:move()
@@ -1015,7 +1019,7 @@ function player:bomb_input()
 
   if not self.is_bombing and bomb_pressed then
     local bomb_vy = -1.5
-    local bomb_vx = self.facing*rnd(0.1)+self.vx*1.2
+    local bomb_vx = self.facing*rnd(.1)+self.vx*1.2
     sfx(11)
     self.is_bombing=true
     self.throwtimer=7
@@ -1082,9 +1086,9 @@ end --player.ground_input
 
 function player:air_input()
   if btn(0) then
-    self.vx-=0.0375
+    self.vx-=.0375
   elseif btn(1) then
-    self.vx+=0.0375
+    self.vx+=.0375
   end
 end --player.air_input
 
@@ -1127,7 +1131,7 @@ function player:running_effects()
   --update the "landed" timer
   --for crouching animation
   if self.landtimer>0 then
-    self.landtimer-=0.4
+    self.landtimer-=.4
   end
 end
 
@@ -1176,7 +1180,7 @@ function player:sliding_effects()
       self.y+1,
       self.facing*abs(self.vy)/4,
       0,
-      0.2
+      .2
       )
   end
 end
@@ -1188,8 +1192,8 @@ function player:head_effects()
     spawnp(
       self.prevx,
       self.prevy - self.hr,
-      -edir*0.3, -- x vel
-      -0.1, -- y vel
+      -edir*.3, -- x vel
+      -.1, -- y vel
       0, --jitter
       10, -- color
       .7 -- duration
@@ -1217,7 +1221,7 @@ function spawnp(x,y,vx,vy,jitter,c,d)
     vx=2*(vx+rnd(jitter*2)-jitter),
     vy=2*(vy+rnd(jitter*2)-jitter),
     c=c or 5,
-    d=d or 0.5
+    d=d or .5
   }
   s.duration=s.d+rnd(s.d)
   s.life=1
@@ -1233,7 +1237,7 @@ function player:hit_spike()
     spawnp(
       self.x,
       self.y+2,
-      sgn(self.vx)*(-0.5 + rnd(2))*rnd(4), -- vx
+      sgn(self.vx)*(-.5 + rnd(2))*rnd(4), -- vx
       -7.5*rnd(), -- vy
       1, -- jitter
       7, -- color
@@ -1478,7 +1482,7 @@ function specks:update()
     speck.y+=speck.vy
     speck.vx*=.85
     speck.vy*=.85
-    speck.life-=1/30/speck.duration
+    speck.life-=.033333333/speck.duration
 
     if speck.life<0 then
       del(self.list,speck)
@@ -1507,7 +1511,7 @@ end
 grasses={
   map={},
   tiles={},
-  anim={timer=0,frames=4,speed=1/15}
+  anim={timer=0,frames=4,speed=.066666667}
 }
 
 
@@ -1595,7 +1599,7 @@ bomb_class={
   wr=1,hr=1,
   vy=-2.5,
   spr_x=16,spr_y=8,
-  anim={timer=0,frames=8,speed=1/6}
+  anim={timer=0,frames=8,speed=.166666667}
 }
 setmetatable(bomb_class,{__index=entity_class})
 
@@ -1687,8 +1691,8 @@ function explosions.update()
     for _,s in pairs(e.sparks) do
       s.x+=s.vx / s.mass
       s.y+=s.vy / s.mass
-      s.r-=0.2
-      if s.r<0.5 then
+      s.r-=.2
+      if s.r<.5 then
         del(e.sparks,s)
       end
     end -- for s in e.sparks
@@ -1718,10 +1722,10 @@ function explosions.add(x,y,intensity,color)
   e.sparks={}
   for i=1,50 do
     local spark={}
-    spark.mass=0.5+rnd(2)
-    spark.r=0.25+rnd(intensity)
-    spark.vx=(-1+rnd(2))*0.5
-    spark.vy=(-1+rnd(2))*0.5
+    spark.mass=.5+rnd(2)
+    spark.r=.25+rnd(intensity)
+    spark.vx=(-1+rnd(2))*.5
+    spark.vy=(-1+rnd(2))*.5
     spark.x=e.x+spark.vx
     spark.y=e.y+spark.vy
     add(e.sparks,spark)
@@ -1760,9 +1764,9 @@ function game_mode.intro:update()
       32+rnd(96),
       -5, -- x vel
       -5, -- y vel
-      0.1, --jitter
-      5, -- color
-      0.5 -- duration
+      .1, -- jitter
+      5,  -- color
+      .5 -- duration
       )
   end
 end
@@ -1772,7 +1776,7 @@ function game_mode.intro:draw()
   clouds:draw()
   specks:draw()
 
-  self.animtimer+=0.25
+  self.animtimer+=.25
   if self.animtimer>self.animlength then
     self.animtimer=1
   end
@@ -1909,12 +1913,12 @@ end
 --------------------------------
 bee_class={
   name="bee",
-  anim={timer=0,frames=3,speed=1/4},
+  anim={timer=0,frames=3,speed=.25},
   spr_x=64,spr_y=8,
   is_bee=true,
   has_gravity=false,
-  vx_turning=0.05,
-  vy_turning=0.1,
+  vx_turning=.05,
+  vy_turning=.1,
   w=7,h=7,wr=3,hr=3,
   flipx=false,
   update_counter=0,
@@ -1937,7 +1941,7 @@ function bee_class:new(obj)
 end
 
 function bee_class:jitter()
-  local offset=sin(time())*0.15
+  local offset=sin(time())*.15
   self.vy=mid(self.vy+offset,-self.max_vy,self.max_vy)
 end
 
@@ -2098,9 +2102,9 @@ function game_mode.outro:update()
       32+rnd(96),
       -3, -- x vel
       -3, -- y vel
-      0.1, --jitter
+      .1, --jitter
       10, -- color
-      0.5 -- duration
+      .5 -- duration
       )
   end
 end
