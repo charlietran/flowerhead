@@ -2044,7 +2044,6 @@ end
 bees={
   -- how many frames to delay after spawning for
   -- bees to start pathfinding the player
-  spawn_pathfinding_delay=60,
 }
 
 function bees:spawn(cx,cy)
@@ -2070,9 +2069,7 @@ function bees:spawn(cx,cy)
     -- add our new bee to the bee list
     function() insert(entities,bee) end,
     -- animate the bee zooming from its initial big size down to normal
-    make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},duration=60}),
-    -- after our specified delay, then enable pathfinding
-    make_delay(bees.spawn_pathfinding_delay),
+    make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},hold=60,duration=60}),
     function() bee.pathfinder.enabled=true; bee.spawning=false end
   },true)
 
