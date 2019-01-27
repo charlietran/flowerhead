@@ -210,7 +210,10 @@ level_class={
 }
 
 function level_class.new(o)
-  local level=setmetatable(o or {}, {__index=level_class})
+  local level=setmetatable(
+  	o or {}, 
+  	{__index=level_class}
+  )
   level:setup()
   return level
 end
@@ -220,7 +223,7 @@ function level_class:setup()
   -- initialize the level object
   -- with initial coordinates
   -- from the top-left block
-  -- x/y = pixel coords
+  -- x/y   = pixel coords
   -- cx/cy = map cell coords
   self.sx1=cx1*8
   self.sy1=cy1*8
@@ -321,7 +324,8 @@ function level_class:open_door(with_rays)
 end
 
 function level_class:make_door_anim()
-  local x,y=self.door_cx*8+5,self.door_cy*8+2
+  local x,y=self.door_cx*8+5,
+  										self.door_cy*8+2
   local frame_count=0
 
   return function()
@@ -331,12 +335,12 @@ function level_class:make_door_anim()
     local rays=16
     local dx,dy=player.x-x,player.y-y
 
-    -- distance to the player (pythagorean)
-    -- divided then re-multiplied by 1000
-    -- to avoid integer overflow
+    -- pythag dist to the player
+    -- divide then mult by 1000
+    -- to avoid int overflow
     local distance=sqrt((dx/1000)^2+(dy/1000)^2)*1000
     if frame_count>120 then
-    distance*=(1-(frame_count-120)/120)
+					distance*=(1-(frame_count-120)/120)
     end
 
     -- get the angle to the player
@@ -366,71 +370,40 @@ function level_class:make_door_anim()
   end
 end
 
-
 levels={ list={} }
 
--- find each level block, add
--- it to the list with coords
 function levels:init()
-  -- reload map data from cartridge
-  reload(0x2000, 0x2000, 0x1000)
+  -- reload map data from cart
+  reload(0x2000,0x2000,0x1000)
 
   -- level list --
   levels.list={
-    level_class.new({
-        index=1,
-        cx1=0,cy1=0,
-        desc="welcome to the dungeon",
-      }),
-    level_class.new({
-        index=2,
-        cx1=16,cy1=0,
-        desc="meet the spikes",
-      }),
-    level_class.new({
-        index=3,
-        cx1=32,cy1=0,
-        desc="a locked door",
-      }),
-    level_class.new({
-        index=4,
-        cx1=48,cy1=0,
-        desc="leap motion",
-      }),
-    level_class.new({
-        index=5,
-        cx1=64,cy1=0,
-        desc="over the top",
-      }),
-    level_class.new({
-        index=6,
-        cx1=112,cy1=0,
-        desc="z jumpin'",
-      }),
-    level_class.new({
-        index=7,
-        cx1=78,cy1=0,
-        num_bees=2,
-        desc="here there be bees",
-      }),
-    level_class.new({
-        index=8,
-        cx1=0,cy1=16,
-        num_bees=4,
-        desc="feeding time",
-      }),
-    level_class.new({
-        index=9,
-        cx1=94,cy1=28,
-        num_bees=4,
-        desc="the throne room"
-      })
+ 		add_level(1,0,0,0,  "welcome to the dungeon"),
+ 		add_level(2,16,0,0, "meet the spikes"),
+ 		add_level(3,32,0,0, "a locked door"), 
+ 		add_level(4,48,0,0, "leap motion"), 
+ 		add_level(5,64,0,0, "over the top"),
+ 		add_level(6,112,0,0,"z jumpin'"),
+ 		add_level(7,78,0,2, "here there be bees"),
+   add_level(8,0,16,4, "feeding time"),
+   add_level(9,94,28,6,"the throne room"),
   }
 
   levels.index=1
   levels.door_frame=0
   lvl=levels.list[1]
 end -- levels:init
+
+function add_level(i,x,y,b,d)
+	return level_class.new({
+		index=i,
+		cx1=x,
+		cy1=y,
+		num_bees=b,
+		desc=d
+	})
+end
+
 
 
 function levels:draw()
