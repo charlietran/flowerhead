@@ -71,7 +71,7 @@ function game_mode.game:update()
   -- entities include player, bees, bombs
   for _,e in pairs(entities) do e:update() end
 
-  specks:update()
+  particles:update()
   explosions:update()
 end
 
@@ -84,7 +84,7 @@ function game_mode.game:draw()
   grasses:draw()
   -- entities include player, bees, bombs
   for _,e in pairs(entities) do e:draw() end
-  specks:draw()
+  particles:draw()
   explosions:draw()
   banners:draw()
   cam:fade()
@@ -132,7 +132,7 @@ function reset_level()
     flowerheart_class:new({x=lvl.flowerheart_x,y=lvl.flowerheart_y})
   end
   truncate(grasses.map)
-  truncate(specks.list)
+  truncate(particles.list)
   truncate(explosions.list)
   truncate(deferred_draws)
 end
@@ -1188,25 +1188,6 @@ function player:head_effects()
   end
 end
 
--- spawn a particle effect
-function spawnp(x,y,vx,vy,jitter,c,d)
-  --object for the particle
-  local s={
-    x=x,
-    y=y,
-    ox=x,
-    oy=y,
-    vx=2*(vx+rnd(jitter*2)-jitter),
-    vy=2*(vy+rnd(jitter*2)-jitter),
-    c=c or 5,
-    d=d or .5
-  }
-  s.duration=s.d+rnd(s.d)
-  s.life=1
-
-  add(specks.list,s)
-end
-
 function player:hit_spike()
   if self.dead then return end
   self.dead=true
@@ -1446,41 +1427,61 @@ function is_plantable(cx,cy)
   not is_exit(above_tile)
 end
 
---effects-----------------------
+--particle spawning-------------
 --------------------------------
+function spawnp(x,y,vx,vy,jitter,c,d)
+  --object for the particle
+  local s={
+    x=x,
+    y=y,
+    ox=x,
+    oy=y,
+    vx=2*(vx+rnd(jitter*2)-jitter),
+    vy=2*(vy+rnd(jitter*2)-jitter),
+    c=c or 5,
+    d=d or 15
+  }
+  s.duration=s.d+rnd(s.d)
+  s.life=1
 
---specks holds all particles to
---be drawn in our object loop
-specks={list={}}
-function specks:update()
-  for _,speck in pairs(self.list) do
-    speck.ox=speck.x
-    speck.oy=speck.y
-    speck.x+=speck.vx
-    speck.y+=speck.vy
-    speck.vx*=.85
-    speck.vy*=.85
-    speck.life-=.033333333/speck.duration
+  add(particles.list,s)
+end
 
-    if speck.life<0 then
-      del(self.list,speck)
+--particles holds all particles
+--to be drawn in our object loop
+particles={list={}}
+function particles:update()
+  for _,p in pairs(self.list) do
+    -- save original x/y
+    p.ox=p.x
+    p.oy=p.y
+    -- apply velocity
+    p.x+=p.vx
+    p.y+=p.vy
+    -- velocity diminishes
+    p.vx*=.85
+    p.vy*=.85
+
+    p.life-=1/p.duration
+
+    if p.life<0 then
+      del(self.list,p)
     end
 
-    if current_game_mode.is_game and is_wall(mget(speck.x/8,speck.y/8)) then
-      del(self.list,speck)
+    -- kill if touching map
+    if current_game_mode.is_game and is_wall(mget(p.x/8,p.y/8)) then
+      del(self.list,p)
     end
   end
 end
 
-function specks:draw()
-  for _,speck in pairs(self.list) do
+function particles:draw()
+  for _,p in pairs(self.list) do
     line(
-      speck.x,
-      speck.y,
-      speck.ox,
-      speck.oy,
-      speck.c+(speck.life/2)*3
-      )
+      p.x,p.y,
+      p.ox,p.oy,
+      p.c+(p.life/2)*3
+    )
   end
 end
 
@@ -1733,7 +1734,7 @@ function game_mode.intro:update()
     music(0,0,1)
   end
 
-  specks:update()
+  particles:update()
 
   -- spawn speed streaks
   if self.animtimer%2==0 then
@@ -1752,7 +1753,7 @@ end
 function game_mode.intro:draw()
   cls()
   clouds:draw()
-  specks:draw()
+  particles:draw()
 
   self.animtimer+=.25
   if self.animtimer>self.animlength then
@@ -2082,7 +2083,7 @@ end
 
 function game_mode.outro:update()
   if btnp(4) then _init() end
-  specks:update()
+  particles:update()
   self.animtimer+=1
   if self.animtimer%2==0 then
     spawnp(
@@ -2101,7 +2102,7 @@ function game_mode.outro:draw()
   cls()
   music(-1,50)
   camera(0,0)
-  specks:draw()
+  particles:draw()
   local lines = {
     "you planted all the flowers!!",
     "your time: "..(flr(gametime/60)).." seconds",
