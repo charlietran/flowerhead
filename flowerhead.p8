@@ -568,7 +568,7 @@ function poof(x,y,c)
       sin(i/64), -- vy
       1, -- jitter
       c, -- color
-      .75 -- duration
+      22 -- duration
       )
   end
 end
@@ -1101,7 +1101,7 @@ function player:running_effects()
         self.y+2,   --y pos
         -self.vx/3, --x vel
         -abs(self.vx)/6,--y vel,
-        .5 --jitter amount
+        .5 --jitter
         )
     end
   end
@@ -1137,8 +1137,7 @@ function player:landing_effects()
       self.y+2,
       self.landing_v/3*(rnd(2)-1),
       -self.landing_v/2*rnd(),
-      .3
-      )
+      .3)
   end
 
   --slight camera shake
@@ -1158,8 +1157,7 @@ function player:sliding_effects()
       self.y+1,
       self.facing*abs(self.vy)/4,
       0,
-      .2
-      )
+      .2)
   end
 end
 
@@ -1174,7 +1172,7 @@ function player:head_effects()
       -.1, -- y vel
       0, --jitter
       10, -- color
-      .7 -- duration
+      21 -- duration
       )
     self.prevx=self.x
     self.prevy=self.y
@@ -1194,13 +1192,12 @@ function player:hit_spike()
   self.dying_timer=30
   for i=1,100 do
     spawnp(
-      self.x,
-      self.y+2,
+      self.x,self.y+2,
       sgn(self.vx)*(-.5 + rnd(2))*rnd(4), -- vx
       -7.5*rnd(), -- vy
       1, -- jitter
       7, -- color
-      .75 -- duration
+      22 -- duration
       )
     sfx(42)
   end
@@ -1744,9 +1741,8 @@ function game_mode.intro:update()
       -5, -- x vel
       -5, -- y vel
       .1, -- jitter
-      5,  -- color
-      .5 -- duration
-      )
+      5  -- color
+    )
   end
 end
 
@@ -1780,7 +1776,7 @@ function game_mode.intro:draw()
       -.2, -- y vel
       0, --jitter
       10, -- color
-      .7 -- duration
+      21 -- duration
       )
   end
     print(
@@ -2091,9 +2087,8 @@ function game_mode.outro:update()
       32+rnd(96),
       -3, -- x vel
       -3, -- y vel
-      .1, --jitter
-      10, -- color
-      .5 -- duration
+      .1, -- jitter
+      10  -- color
       )
   end
 end
