@@ -715,13 +715,13 @@ function flowerheart_class:e_collide_callback(entity)
     music(11,0,15)
     freeze=true
     cinematic(
-      { "you got the flower-heart!",
-        "press x to throw seed bombs",
+      {
         "",
-        "cover the floor",
-        "unlock the door",
+        "you found your heart",
+        "",
+        "press x to throw seed bombs",
       },
-      360,
+      260,
       function()
         freeze=false
         self:enable_bombing()
