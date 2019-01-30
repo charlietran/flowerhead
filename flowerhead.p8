@@ -117,6 +117,10 @@ function reset_level()
     mset(t[1],t[2],t[3])
   end
 
+  -- clean up bees
+  sfx(-1,3)
+  bees.count=0
+
   lvl.percent_complete=0
   lvl.planted=0
   lvl.bombs_disabled=true
@@ -211,7 +215,7 @@ level_class={
 
 function level_class.new(o)
   local level=setmetatable(
-  	o or {}, 
+  	o or {},
   	{__index=level_class}
   )
   level:setup()
@@ -314,8 +318,8 @@ end
 
 function level_class:open_door(with_rays)
   self.door_open=true
-  if with_rays then 
-  	sfx(0,2) 
+  if with_rays then
+  	sfx(0)
    add(
    	deferred_draws,
    	self:make_door_anim()
@@ -378,15 +382,16 @@ function levels:init()
 
   -- level list --
   levels.list={
- 		add_level(1,0,0,0,  "welcome to the dungeon"),
- 		add_level(2,16,0,0, "meet the spikes"),
- 		add_level(3,32,0,0, "a locked door"), 
- 		add_level(4,48,0,0, "leap motion"), 
- 		add_level(5,64,0,0, "over the top"),
- 		add_level(6,112,0,0,"z jumpin'"),
- 		add_level(7,78,0,2, "here there be bees"),
-   add_level(8,0,16,4, "feeding time"),
-   add_level(9,94,28,6,"the throne room"),
+ 		add_level(1 ,0  ,0 ,0,"welcome to the dungeon"),
+ 		add_level(2 ,16 ,0 ,0,"meet the spikes"),
+ 		add_level(3 ,32 ,0 ,0,"get a heart"),
+ 		add_level(4 ,48 ,0 ,0,"leap motion"),
+ 		add_level(5 ,64 ,0 ,0,"over the top"),
+ 		add_level(6 ,112,0 ,0,"z jumpin'"),
+ 		add_level(7 ,78 ,0 ,2,"here there be bees"),
+   add_level(8 ,0  ,16,4,"feeding time"),
+   add_level(9 ,16 ,16,1,"crumblies"),
+   add_level(10,94 ,28,6,"the throne room"),
   }
 
   levels.index=1
@@ -403,8 +408,6 @@ function add_level(i,x,y,b,d)
 		desc=d
 	})
 end
-
-
 
 function levels:draw()
   -- animate the door
@@ -510,11 +513,11 @@ function game_mode.lvl_complete:start()
   current_game_mode=game_mode.lvl_complete
   lvl.exited=true
   player.vx=0
-  music(10)
+  music(10,0,15)
 
   cinematic(false,120,
         function()
-          music(0)
+          music(0,0,1)
           levels:goto_next()
         end)
 end
@@ -712,7 +715,7 @@ function flowerheart_class:e_collide_callback(entity)
   if not entity.is_player then return end
   if lvl.index==3 and not flowerheart_obtained then
     flowerheart_obtained=1
-    music(11)
+    music(11,0,15)
     freeze=true
     cinematic(
       { "you got the flower-heart!",
@@ -725,7 +728,7 @@ function flowerheart_class:e_collide_callback(entity)
       function()
         freeze=false
         self:enable_bombing()
-        music(0)
+        music(0,0,1)
         sfx(7)
       end,
       3
@@ -1613,7 +1616,7 @@ end
 
 function bomb_class:dud()
   explosions.add(self.x,self.y+2,2)
-  sfx(43,3)
+  sfx(43)
   self:die()
 end
 
@@ -1624,8 +1627,8 @@ function bomb_class:explode()
     grasses.plant(i,self.y)
   end
   laff(self.x,self.y)
-  sfx(40,-1)
-  sfx(41,-1)
+  sfx(40)
+  sfx(41)
   cam:shake(6,1)
   self:die()
 end
@@ -1725,7 +1728,7 @@ function game_mode.intro:update()
   if btnp(5) then
     current_game_mode=game_mode.game
     reset_level()
-    music(0)
+    music(0,0,1)
   end
 
   specks:update()
@@ -1983,6 +1986,8 @@ function bee_class:die()
   poof(self.x,self.y,9)
   entity_class.die(self)
   sfx(42)
+  bees.count=bees.count-1
+  if bees.count==0 then sfx(-1,3) end
 end
 
 -- debugging visualization to draw the pathfinding
@@ -2021,6 +2026,7 @@ end
 bees={
   -- how many frames to delay after spawning for
   -- bees to start pathfinding the player
+  count=0,
 }
 
 function bees:spawn(cx,cy)
@@ -2044,10 +2050,17 @@ function bees:spawn(cx,cy)
     -- make a spawn effect centered above the tile
     bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
     -- add our new bee to the bee list
-    function() insert(entities,bee) end,
+    function()
+      insert(entities,bee)
+      bees.count=bees.count+1
+    end,
     -- animate the bee zooming from its initial big size down to normal
+    function() sfx(16,3) end,
     make_animation(bee,{props={x=cx*8+bee.wr+1,y=cy*8-8+bee.hr,scale=1},hold=60,duration=60}),
-    function() bee.pathfinder.enabled=true; bee.spawning=false end
+    function()
+    	bee.pathfinder.enabled=true
+    	bee.spawning=false
+    end
   },true)
 
   add(coroutines,seq)
@@ -2788,7 +2801,7 @@ __sfx__
 010400000e60024000307002450030500247003050018500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010300000041500605000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01030000004770c675180001800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-010b00001880018800188001880518800168041680200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010e002006136061260812608126041360612607136091260812607136071260213608136061260612606126061360613607136081260812609126091360a1260912609136081260813608126071260713607126
 010b0000188051880016804168021880516805168041680218805188001b8041b802188051880016804168021880518800168041680218805188001b8041b8021880518800168041680218805188001680416802
 010b000030e0530600306003060030e053060030600306003060530600306003060030e0530e0030e0030e0030e0530e0030e0030e0030e0530e0030e0030e0030e0530e0030e0030e0030e0530e0030e0030e00
 010b000030e0530e0000c0530e0030e0530e0000c0530e0030e0530e0000c0530e0030e0530e0030e0530e0000c0530e0030e0530e0030e0530e0000c0530e0030e0530e0000c0530e0030e0530e0000c0530e00
