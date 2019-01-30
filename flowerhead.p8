@@ -316,15 +316,10 @@ function level_class:set_spawn()
   end
 end
 
-function level_class:open_door(with_rays)
+function level_class:open_door()
   self.door_open=true
-  if with_rays then
-  	sfx(0)
-   add(
-   	deferred_draws,
-   	self:make_door_anim()
-   )
-  end
+  sfx(0,0)
+  add(deferred_draws,self:make_door_anim())
 end
 
 function level_class:make_door_anim()
@@ -342,7 +337,9 @@ function level_class:make_door_anim()
     -- pythag dist to the player
     -- divide then mult by 1000
     -- to avoid int overflow
-    local distance=sqrt((dx/1000)^2+(dy/1000)^2)*1000
+    local distance=sqrt(
+     (dx/1000)^2+(dy/1000)^2
+    )*1000
     if frame_count>120 then
 					distance*=(1-(frame_count-120)/120)
     end
@@ -357,7 +354,7 @@ function level_class:make_door_anim()
 
       -- subtract our angle from tmod so that it points
       -- towards the player
-      local dmod_angle = tmod-angle
+      local dmod_angle=tmod-angle
 
       -- modify distance so that it shrinks while
       -- pointing away from the player
@@ -838,7 +835,6 @@ function player:draw()
   if self.dead then return end
   self.headanimtimer=self.headanimtimer%3+1
 
-
   --if throwing, draw swoosh
   if self.throwtimer>0 then
     local xoff=-4
@@ -899,9 +895,9 @@ function player:update()
     self:handle_input()
   end
 
-  -- apply "air resistance"
-  -- each frame, reduce player x speed by 2%
-  -- prevents player from going too fast
+  -- apply drag
+  -- each frame reduce our vx 2%
+  -- so we don't move too fast
   self.vx*=.98
 
   self.falltimer+=1
@@ -917,16 +913,17 @@ end
 function player:m_collide_callback(collision)
   if collision.axis=='x' then
     self.vx=0
-  end
-  if collision.axis=='y' then
-    --trigger a landing effect
+  elseif collision.axis=='y' then
+    self.vy=0
+
+    --set landing velocity
+    --for landing effects
     if self.vy > 1 then
       self.landing_v=self.vy
     end
 
-    --zero out y velocity and
-    self.vy=0
-    --reset falling timer if touched ground
+    --reset falling timer if
+    --collision dir is down
     if collision.distance>0 then
       self.falltimer=0
       self.standing=true
@@ -935,7 +932,6 @@ function player:m_collide_callback(collision)
       end
     end
   end
-
 end
 
 function player:check_sliding()
@@ -1334,13 +1330,8 @@ function crumble(cx,cy)
   end))
 end
 
--- special logic for map spike sprites
--- since they are only 4 pixels tall
--- 48 up
--- 49 left
--- 50 right
--- 51 down
-
+--special coll logic for spikes
+--their hitbox is 4 pixels tall
 spike_hitboxes={
   --48 up mini spike
   {1,4,7,8},
@@ -1413,15 +1404,16 @@ function is_crumbler(tile)
   return fget(tile,6)
 end
 
--- a tile is plantable if it has flag 1 set
--- and the tile above it is not a wall, exit or spike
+--tile plantable if flag 1 set
+--and the tile above it
+--is not a wall, exit or spike
 function is_plantable(cx,cy)
   local tile=mget(cx,cy)
   local above_tile=mget(cx,cy-1)
   return fget(tile,1) and
-  not is_wall(above_tile) and
-  not is_spike(above_tile) and
-  not is_exit(above_tile)
+   not is_wall(above_tile) and
+   not is_spike(above_tile) and
+   not is_exit(above_tile)
 end
 
 --particle spawning-------------
@@ -1490,15 +1482,14 @@ grasses={
   anim={timer=0,frames=4,speed=.066666667}
 }
 
-
 function grasses:draw()
   self.anim.timer=(self.anim.timer+self.anim.speed)%self.anim.frames
 
   local spr_x,spr_y
   for grass_row,grasses in pairs(self.map) do
     for grass_col,grass_value in pairs(grasses) do
-      spr_x=3 * flr(self.anim.timer)
-      spr_y=8 + 2*grass_value
+      spr_x=3*flr(self.anim.timer)
+      spr_y=8+2*grass_value
       sspr(
         spr_x,spr_y,  -- sprite coords
         3,2,          -- width, height
@@ -1517,6 +1508,7 @@ function grasses.plant(x,y)
 
   -- return if grass already at x
   if grasses.map[y][x] then return end
+
   -- return if the tile below is not plantable
   if not is_plantable(cx,cy+1) then return end
 
@@ -1561,7 +1553,7 @@ function grasses.update_tile(cx,cy)
 
     -- open the door if possible
     if not lvl.door_open and not lvl.exited and lvl.planted>=lvl.plantable then
-      lvl:open_door(true)
+      lvl:open_door()
     end
   end
 end
@@ -1985,7 +1977,7 @@ function bee_class:die()
   poof(self.x,self.y,9)
   entity_class.die(self)
   sfx(42)
-  bees.count=bees.count-1
+  bees.count-=1
   if bees.count==0 then sfx(-1,3) end
 end
 
@@ -2467,7 +2459,7 @@ function game_mode.debug_menu:update()
       end
     })
   add(self.items,{
-      "open current door", function() lvl:open_door(true) end
+      "open current door", function() lvl:open_door() end
     })
 end
 
