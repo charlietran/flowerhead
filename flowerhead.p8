@@ -994,8 +994,10 @@ function player:bomb_input()
   end
 
   if not self.is_bombing and bomb_pressed then
-    local bomb_vy = -1.5
-    local bomb_vx = self.facing*rnd(.1)+self.vx*1.2
+    local bomb_vy=-1.5
+    local bomb_vx=self.facing *
+                  rnd(.4) +
+                  self.vx * 1.2
     sfx(11)
     self.is_bombing=true
     self.throwtimer=7
