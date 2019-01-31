@@ -485,18 +485,24 @@ function banners:add(level)
   local banner={
     title="level "..level.index,
     caption=level.desc,
-    height=level.banner_height or 32,
+    height=32,
     x=0
   }
   banner.y=-banner.height -- start banner off screen
   add(self.list,banner)
 
-  local anim1={duration=45,props={x=0,y=0}}
-  local anim2={duration=45,props={x=0,y=-banner.height},easing=ease_in_quad}
+  local anim1={
+   duration=45,
+   props={x=0,y=64-(banner.height/2)}
+  }
+  local anim2={
+   duration=45,
+   props={x=0,y=-banner.height},
+   easing=ease_in_quad
+  }
   local seq=coroutine_sequence({
     make_animation(banner,anim1),
-    make_delay(30),
-    make_animation(banner,anim2),
+    make_delay(60),
     function() del(self.list,banner) end
   })
 
@@ -510,22 +516,28 @@ function banners:draw()
     -- adjust banner x and y for camera position
     local x=cam.x-64
     local y=cam.y-64+b.y
-    local width=127
+    local width=73
     local margin=(128-width)/2
 
     rectfill(x+margin+2,y+2,x+margin+width+2,y+b.height+2,2)
-    fillp(0b0111101111011110)
+    --fillp(0b0111101111011110)
     rectfill(x+margin,y,x+margin+width,y+b.height,1)
-    fillp()
+    --fillp()
 
-    for i=1,#b.title do
-      print(
-        sub(b.title,i,i),
-        x+margin+(width-#b.title*6)/2 + (i-1)*6,
-        y+b.height/4+sin(i/#b.title + tm/2),
-        10)
-    end
+    --for i=1,#b.title do
+    --  print(
+    --    sub(b.title,i,i),
+    --    x+margin+(width-#b.title*6)/2 + (i-1)*6,
+    --    y+b.height/4+sin(i/#b.title + tm/2),
+    --    10)
+    --end
 
+    print(
+     b.title,
+     x+margin+(width-#b.title*4)/2,
+     y+b.height/4,
+     10
+    )
     print(
       b.caption,
       x+margin+(width-#b.caption*4)/2,
