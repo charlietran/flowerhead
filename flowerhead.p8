@@ -1926,7 +1926,7 @@ function bee_class:update()
 end
 
 function bee_class:draw()
-  if toggles.path_vis then self:draw_paths() end
+  --if toggles.path_vis then self:draw_paths() end
   entity_class.draw(self)
 end
 
@@ -1939,18 +1939,17 @@ end
 -- adjust bee velocity to move towards target
 function bee_class:steer()
   if not self.target_x then return end
+
   if self.target_x<self.x then
     self.vx=max(self.vx-self.vx_turning,-self.max_vx*1/self.scale)
-  end
-  if self.target_x>=self.x then
+  else
     self.vx=min(self.vx+self.vx_turning,self.max_vx*1/self.scale)
   end
   self.flipx=self.vx<0
 
   if self.target_y<self.y then
     self.vy=max(self.vy-self.vy_turning,-self.max_vy*1/self.scale)
-  end
-  if self.target_y>=self.y then
+  else
     self.vy=min(self.vy+self.vy_turning,self.max_vy*1/self.scale)
   end
 end
@@ -1962,8 +1961,8 @@ function bee_class:e_collide_callback(entity)
   -- kill the player if touching, then recall bees to the door
   if entity.is_player then
     player:hit_spike()
-
-    -- if hit by a bomb, grow 20%, until exploding at 200% escale
+  --if hit by a bomb, grow 20%,
+  --exploding at 200% scale
   elseif entity.is_bomb then
     entity:dud()
     self.scale+=.2
@@ -1983,36 +1982,36 @@ end
 
 -- debugging visualization to draw the pathfinding
 -- for each bee
-function bee_class:draw_paths()
-  local pf=self.pathfinder
-  for cell in all(pf.visited) do
-    local px,py=cell[1][1]*8,cell[1][2]*8
-    fillp(0b0000111100001111)
-    rectfill(px,py, px+7,py+7,3)
-    fillp()
-    print(cell[2],px,py+2,11)
-  end
+--function bee_class:draw_paths()
+  --local pf=self.pathfinder
+  --for cell in all(pf.visited) do
+    --local px,py=cell[1][1]*8,cell[1][2]*8
+    --fillp(0b0000111100001111)
+    --rectfill(px,py, px+7,py+7,3)
+    --fillp()https://arstechnica.com/gaming/2019/01/kingdom-mixes-zombie-outbreak-with-political-intrigue-in-winning-combo/
+    --print(cell[2],px,py+2,11)
+  --end
 
-  if pf.next_cell then
-    rectfill(
-      pf.next_cell[1]*8,pf.next_cell[2]*8,
-      pf.next_cell[1]*8+7,pf.next_cell[2]*8+7,
-      7)
-  end
+  --if pf.next_cell then
+    --rectfill(
+      --pf.next_cell[1]*8,pf.next_cell[2]*8,
+      --pf.next_cell[1]*8+7,pf.next_cell[2]*8+7,
+      --7)
+  --end
 
-  local points={}
-  for cell in all(pf.path) do
-    add(points,{cell[1]*8+4,cell[2]*8+4})
-  end
+  --local points={}
+  --for cell in all(pf.path) do
+    --add(points,{cell[1]*8+4,cell[2]*8+4})
+  --end
 
-  for i=2,#points do
-    local x1=points[i-1][1]
-    local y1=points[i-1][2]
-    local x2=points[i][1]
-    local y2=points[i][2]
-    line(x1,y1,x2,y2,8)
-  end
-end
+  --for i=2,#points do
+    --local x1=points[i-1][1]
+    --local y1=points[i-1][2]
+    --local x2=points[i][1]
+    --local y2=points[i][2]
+    --line(x1,y1,x2,y2,8)
+  --end
+--end
 
 bees={
   -- how many frames to delay after spawning for
@@ -2037,7 +2036,7 @@ function bees:spawn(cx,cy)
 
   bee.pathfinder.enabled=false
 
-  local seq=coroutine_sequence({
+  add(coroutines,coroutine_sequence({
     -- make a spawn effect centered above the tile
     bees:make_spawn_effect(cx*8+4,cy*8-1, (-1+rnd(2))*.5,-1, 60),
     -- add our new bee to the bee list
@@ -2052,9 +2051,7 @@ function bees:spawn(cx,cy)
     	bee.pathfinder.enabled=true
     	bee.spawning=false
     end
-  },true)
-
-  add(coroutines,seq)
+  },true))
 end
 
 -- return a function that draws a "fountain" particle
@@ -2417,7 +2414,7 @@ function linear(t)
 end
 
 -- debug menu
-
+-------------
 game_mode.debug_menu.sel=1
 game_mode.debug_menu.items={}
 
@@ -2449,18 +2446,19 @@ function game_mode.debug_menu:update()
     })
 
   self:make_toggle"performance"
-  self:make_toggle"path_vis"
+  --self:make_toggle"path_vis"
   self:make_toggle"a_star"
   self:make_toggle"max_beez"
 
-  add(self.items,{
-      "spawn bee", function()
-        insert(entities, bee_class:new({x=lvl.sx1+12,y=lvl.sy1+12}))
-      end
-    })
-  add(self.items,{
-      "open current door", function() lvl:open_door() end
-    })
+  --add(self.items,{
+      --"spawn bee", function()
+        --insert(entities, bee_class:new({x=lvl.sx1+12,y=lvl.sy1+12}))
+      --end
+    --})
+
+  --add(self.items,{
+      --"open current door", function() lvl:open_door() end
+    --})
 end
 
 function game_mode.debug_menu:draw()
