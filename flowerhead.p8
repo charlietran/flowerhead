@@ -23,8 +23,10 @@ function _init()
   runanimspeed=.3
   wallrunanimspeed=.2
 
-  -- game length timer
+  -- game counters
   gametime=0
+  death_count=0
+  thrown_count=0
 
   coroutines={}
   deferred_draws={}
@@ -65,7 +67,7 @@ function _draw()
 end
 
 function game_mode.game:update()
-  gametime+=1
+  gametime+=.016666667
   cam:update()
 
   -- entities include player, bees, bombs
@@ -466,6 +468,7 @@ function levels:goto_next()
   lvl=self.list[self.index]
 
   if not lvl then
+    music(13)
     current_game_mode=game_mode.outro
     return
   end
@@ -1023,6 +1026,7 @@ function player:bomb_input()
     sfx(11)
     self.is_bombing=true
     self.throwtimer=7
+    thrown_count+=1
     bomb_class:new({
       x=self.x,
       y=self.y-1,
@@ -1210,6 +1214,7 @@ end
 
 function player:hit_spike()
   if self.dead then return end
+  death_count+=1
   self.dead=true
   self.dying_timer=30
   for i=1,100 do
@@ -2110,18 +2115,25 @@ end
 
 function game_mode.outro:draw()
   cls()
-  music(-1,50)
   camera(0,0)
   particles:draw()
-  local lines = {
-    "you planted all the flowers!!",
-    "your time: "..(flr(gametime/60)).." seconds",
-    "press z to restart"
+
+  game_beaten=true
+
+  lines = {
+   "      good job, flowerhead",
+   "you planted all the dang flowers",
+   "",
+   "      game time: "..(flr(gametime)).." seconds",
+   "    flowerbombs: "..thrown_count .." thrown",
+   "         deaths: "..death_count,
+   "",
+   "     press jump to restart"
   }
 
   for i,line in pairs(lines) do
-    local x = 64-#line*2
-    local y = 45 + i*8
+    local x = 0
+    local y = 16 + i*8
     print(line,x,y,7)
   end
 end
@@ -2186,7 +2198,6 @@ function pathfinder_class:search_frontier()
   end -- while #frontier>0
 end
 
-
 function pathfinder_class.get_neighbor_cells(cell)
   local neighbors={}
   local x,y=cell[1],cell[2]
@@ -2222,11 +2233,11 @@ function pathfinder_class:expand_frontier(neighbor_cells,current,search_depth)
     local new_cost=self.cost_so_far[current.index]+1
 
     -- a* epsilon weighting
-    local e=.6
-    local weight=1
+    --local e=.6
     --if search_depth <= self.search_bound then
       --weight=1+e*(1-search_depth/self.search_bound)
     --end
+    local weight=1
 
     if (not self.cost_so_far[neighbor_index]) or (new_cost < self.cost_so_far[neighbor_index]) then
       add(self.visited,{neighbor_cell,new_cost})
@@ -2256,7 +2267,7 @@ function pathfinder_class:next_target()
   return next_cell[1]*8+4,next_cell[2]*8+4
 end
 
--- utility functions
+-- utility functions -----------
 --------------------------------
 function truncate(tbl)
   for o in all(tbl) do
@@ -2269,6 +2280,7 @@ function manhattan_distance(start, target)
   local c = max( abs(start[1]-target[1]) , abs(start[2]-target[2]) )
   return (m+c)/2
 end
+
 -- converts x/y coordinate to map cell coords
 function pos_to_cell(x,y)
   return {
@@ -2323,9 +2335,9 @@ function insert(tbl,val)
   return val
 end
 
--- insert a value into a priority sorted table
--- assumes the new entry and all prioer entries
--- has a "priority" key
+-- add a value to a sorted table
+-- assumes all entries will
+-- have a "priority" key
 function insert_sorted(tbl,new_entry)
   if #tbl==0 then
     add(tbl,new_entry)
@@ -2364,8 +2376,11 @@ function cowrap(cor,...)
 end
 
 function deferred_animate(obj,params)
-  add(coroutines,
-    cocreate(make_animation(obj,params))
+  add(
+   coroutines,
+   cocreate(
+    make_animation(obj,params)
+   )
   )
 end
 
@@ -2820,7 +2835,7 @@ __sfx__
 010300002d61318405000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010400001a7210e7211a1010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010d00080c111001110c1120c1110c1120c1120c1110c111180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-010400000e60024000307002450030500247003050018500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01140020005530c5552452324523135550c523245232452500555245233050324523005550055524523245030c55510555245231155524523185030c5550c5530c555185030c5230c523185550c5550c52300553
 010300000041500605000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01030000004770c675180001800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010e002006136061260812608126041360612607136091260812607136071260213608136061260612606126061360613607136081260812609126091360a1260912609136081260813608126071260713607126
@@ -2873,7 +2888,7 @@ __music__
 04 0546597f
 03 0656557f
 01 1a252344
-00 1a252444
+03 0d656444
 00 1a1b2444
 00 281c2444
 00 2b1d2544
