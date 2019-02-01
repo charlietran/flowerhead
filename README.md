@@ -2,7 +2,7 @@ Flowerhead is a Pico-8 action game I created in 2018. You can play the game in b
 
 Source
 ------
-The original source for the game is in `flowerhead.p8`. As is, it's too big for Pico8's normal filesize limitations, so I use `build.sh` to minify it via [picotool](https://github.com/dansanderson/picotool) before release.
+The original source for the game is in `flowerhead.p8`. It's in Pico-8's special cartridge format which is a combination of Lua code, graphics, tilemap and sound effects / music data. As is, it's too big for Pico8's normal filesize limitations, so I use `build.sh` to minify it via [picotool](https://github.com/dansanderson/picotool) before release.
 
 Credits
 -------
