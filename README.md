@@ -12,8 +12,7 @@ Additional, many thanks to the following people for their help and support:
 * [Aaron Wood](https://github.com/itscomputers) for helping me figure out the
   math of the sunshine rays and parallax clouds
 * [Lillian Primrose](https://twitter.com/id_load_error) for showing me how to do
-  A\* pathfinding
+  A\* pathfinding for the bees
 * [Sheridan Kates](https://github.com/sheridanvk) for being a wonderful Recurse center buddy and telling me to make the flowers say random things on impact :)
 * [Ayla Myers](https://brid.gs) for inspiring me with their awesome PICO-8 work 
-* [Kicked-in-Teeth](https://kicked-in-teeth.itch.io/pico-8-tiles) whose
-  excellent free art I used in the game
+* [Kicked-in-Teeth](https://kicked-in-teeth.itch.io/pico-8-tiles) whose excellent free art tiles I used and modified for the game
