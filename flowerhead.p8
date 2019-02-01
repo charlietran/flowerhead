@@ -414,8 +414,8 @@ function levels:init()
    add_level(11,48,16,6,"trench run"),
    add_level(12,61,32,1,"hidden tunnel"),
    add_level(13,78,16,2,"twisted tower"),
-   add_level(15,96,32,6,"the throne room"),
-   add_level(16,0 ,32,2,"escape the hive")
+   add_level(14,96,32,6,"the throne room"),
+   add_level(15,0 ,32,2,"escape the hive")
   }
 
   levels.index=1
