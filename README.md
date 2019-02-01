@@ -1,4 +1,8 @@
-Flowerhead is a Pico-8 action game I created in 2018. You can play the game in browser here, on desktop or mobile: https://charlietran.com/games/flowerhead
+Flowerhead is a Pico-8 action game I created in 2018. You can play the game in browser here, on desktop or mobile: https://charlietran.com/games/flowerhead.
+
+Source
+------
+The original source for the game is in `flowerhead.p8`. As is, it's too big for Pico8's normal filesize limitations, so I use `build.sh` to minify it via [picotool](https://github.com/dansanderson/picotool) before release.
 
 Credits
 -------
