@@ -9,7 +9,7 @@ comment='\
 -- by charlie tran \
 -- this code is minified \
 -- see original source here: \
--- github.com/charlietran/flowerhead '
+-- github.com/charlietran/flowerhead'
 
 sed -i '' "s@__lua__@__lua__\
 $comment\
