@@ -14,7 +14,7 @@ at www.charlietran.com
 Thanks
 ------
 * The folks at [Recurse Center](https://www.recurse.com/) in Brooklyn, where I 
-  coded most of the game. It's a wonderful organization, check them out.
+  coded most of the game during the Fall 2018 batch. It's a wonderful organization.
 * [Eli Piilonen](https://twitter.com/2darray) for making [Tiny
   Playformer](https://2darray.itch.io/tinyplatformer), which helped me learn a
   ton about making a dynamic, responsive platformer
