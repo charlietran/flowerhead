@@ -1,9 +1,15 @@
+Flowerhead
+----------
 Flowerhead is a difficult platforming game about escaping a dungeon-hive by
 filling it with flowers and fighting bees. It is made in [Pico-8][1]. You
 can play the game in browser on desktop or mobile:
 https://charlietran.com/games/flowerhead
 
 [1]: https://www.lexaloffle.com/pico-8.php
+
+I've small playable things before, but I would consider this my first real game.
+I hope you like it, and if you have any feedback, you can find my contact info
+at www.charlietran.com
 
 Thanks
 ------
@@ -30,7 +36,7 @@ Source
 ------
 The original source for the game is in `flowerhead.p8`. It's in Pico-8's special
 cartridge format which is a combination of Lua code, graphics, tilemap and sound
-effects / music data. As is, it's too big for Pico8's normal filesize
-limitations, so I use `build.sh` to minify it via
+effects / music data. As is, it's too big for Pico8's normal filesize and token
+limits, so I use `build.sh` to minify it via
 [picotool](https://github.com/dansanderson/picotool) before release.
 
