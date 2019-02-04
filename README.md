@@ -1,10 +1,9 @@
 Flowerhead is a difficult platforming game about escaping a dungeon-hive by
-filling it with flowers and fighting bees, by [Charlie Tran][1]. It is made in
-[Pico-8][2]. You can play the game in browser on desktop or mobile:
+filling it with flowers and fighting bees. It is made in [Pico-8][1]. You
+can play the game in browser on desktop or mobile:
 https://charlietran.com/games/flowerhead
 
-[1]: https://www.charlietran.com
-[2]: https://www.lexaloffle.com/pico-8.php
+[1]: https://www.lexaloffle.com/pico-8.php
 
 Thanks
 ------
