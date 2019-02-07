@@ -1,8 +1,8 @@
 Flowerhead
 ----------
-Flowerhead is a fast-paced platforming game about escaping a dungeon-hive by
-filling it with flowers and fighting bees. It is made in [Pico-8][1]. You
-can play the game in browser on desktop or mobile:
+Flowerhead is a challenging, fast-paced platforming game about escaping 
+a dungeon-hive by filling it with flowers and fighting bees. It is made 
+in [Pico-8][1]. You can play the game in browser on desktop or mobile:
 https://charlietran.itch.io/flowerhead
 
 [1]: https://www.lexaloffle.com/pico-8.php
