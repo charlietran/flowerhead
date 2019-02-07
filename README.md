@@ -7,7 +7,7 @@ https://charlietran.itch.io/flowerhead
 
 [1]: https://www.lexaloffle.com/pico-8.php
 
-I've small playable things before, but I would consider this my first real game.
+I've made small playable things before, but I would consider this my first real game.
 I hope you like it, and if you have any feedback, you can find my contact info
 at www.charlietran.com
 
