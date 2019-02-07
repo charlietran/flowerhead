@@ -1,6 +1,6 @@
 Flowerhead
 ----------
-Flowerhead is a difficult platforming game about escaping a dungeon-hive by
+Flowerhead is a fast-paced platforming game about escaping a dungeon-hive by
 filling it with flowers and fighting bees. It is made in [Pico-8][1]. You
 can play the game in browser on desktop or mobile:
 https://charlietran.itch.io/flowerhead
